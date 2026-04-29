@@ -303,11 +303,11 @@ const STD_HOURS = 176;
 const HOURS_PER_DAY = 8;
 
 const DEFAULT_STAFF = [
-  { no:1, name:"田中 花子", keitai:"A", shokushu:"管理者・看護師", shikaku:"保健師",     kanrisha:true,  nurseKbn:true,  defaultHours:8 },
-  { no:2, name:"佐藤 明美", keitai:"A", shokushu:"看護師",         shikaku:"看護師",     kanrisha:false, nurseKbn:true,  defaultHours:8 },
-  { no:3, name:"鈴木 理恵", keitai:"A", shokushu:"看護師",         shikaku:"准看護師",   kanrisha:false, nurseKbn:true,  defaultHours:8 },
-  { no:4, name:"山田 由美", keitai:"C", shokushu:"看護師",         shikaku:"准看護師",   kanrisha:false, nurseKbn:true,  defaultHours:6 },
-  { no:5, name:"伊藤 一郎", keitai:"A", shokushu:"理学療法士",     shikaku:"理学療法士", kanrisha:false, nurseKbn:false, defaultHours:8 },
+  { no:1, sei:"田中", mei:"花子", keitai:"A", shokushu:"管理者", shikaku:"保健師",     kanrisha:true,  nurseKbn:true,  defaultHours:8 },
+  { no:2, sei:"佐藤", mei:"明美", keitai:"A", shokushu:"看護職員", shikaku:"看護師",     kanrisha:false, nurseKbn:true,  defaultHours:8 },
+  { no:3, sei:"鈴木", mei:"理恵", keitai:"A", shokushu:"看護職員", shikaku:"准看護師",   kanrisha:false, nurseKbn:true,  defaultHours:8 },
+  { no:4, sei:"山田", mei:"由美", keitai:"C", shokushu:"看護職員", shikaku:"准看護師",   kanrisha:false, nurseKbn:true,  defaultHours:6 },
+  { no:5, sei:"伊藤", mei:"一郎", keitai:"A", shokushu:"理学療法士", shikaku:"理学療法士", kanrisha:false, nurseKbn:false, defaultHours:8 },
 ];
 
 const KEITAI_AVATAR = { A:"#4ECDC4", B:"#3498DB", C:"#F39C12", D:"#95A5A6" };
@@ -347,6 +347,11 @@ const $$ = (sel, root=document) => Array.from(root.querySelectorAll(sel));
 const escHtml = (s="") => String(s).replace(/[&<>"']/g, c => ({
   "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;",
 })[c]);
+
+function staffName(s) {
+  if (s.sei || s.mei) return [s.sei, s.mei].filter(Boolean).join(" ");
+  return s.name || "";
+}
 
 function daysInMonth(y, m) { return new Date(y, m, 0).getDate(); }
 function shiftKey(no, y, m) { return `${no}_${y}_${m}`; }
@@ -572,7 +577,7 @@ function renderShift() {
       <td class="txt"   style="width:90px">${escHtml(s.shokushu)}</td>
       <td class="txt-c" style="width:38px"><span class="badge badge-${s.keitai}">${s.keitai}</span></td>
       <td class="txt"   style="width:70px">${escHtml(s.shikaku)}</td>
-      <td class="txt"   style="width:90px;font-weight:700">${escHtml(s.name)}</td>
+      <td class="txt"   style="width:90px;font-weight:700">${escHtml(staffName(s))}</td>
       ${cells}
       <td class="txt-c" style="width:50px;font-weight:600">${totalH}h</td>
       <td class="txt-c" style="width:46px;font-size:10px;color:#666">${weekAvg}h</td>
@@ -686,7 +691,7 @@ function renderStaff() {
   const root = $("#panel-staff");
   let cards = "";
   for (const s of state.staff) {
-    const initial = (s.name || "?").trim().charAt(0);
+    const initial = (s.sei || s.name || "?").trim().charAt(0);
     const color = KEITAI_AVATAR[s.keitai] || "#888";
     const tags = [];
     if (s.kanrisha) tags.push('<span class="badge badge-blue">管理者</span>');
@@ -694,7 +699,7 @@ function renderStaff() {
     cards += `<div class="card">
       <div class="avatar" style="background:${color}">${escHtml(initial)}</div>
       <div class="card-info">
-        <div class="card-name">${escHtml(s.name)} <span class="badge badge-${s.keitai}">${s.keitai}</span></div>
+        <div class="card-name">${escHtml(staffName(s))} <span class="badge badge-${s.keitai}">${s.keitai}</span></div>
         <div class="card-sub">${escHtml(s.shokushu || "")} ／ ${escHtml(s.shikaku || "")}</div>
         <div style="margin-top:4px">${tags.join(" ")} <span class="badge badge-gray">標準 ${s.defaultHours || 8}h/日</span></div>
       </div>
@@ -720,7 +725,10 @@ function openStaffModal(no) {
     <div class="modal-bg" onclick="if(event.target===this) closeModal()">
       <div class="modal">
         <h3>${editing ? "スタッフ編集" : "スタッフ追加"}</h3>
-        <div class="field"><label>氏名 <span style="color:#c00">*</span></label><input id="m_name" type="text" value="${escHtml(s.name)}" placeholder="例: 田中 花子"></div>
+        <div class="field" style="display:flex;gap:8px">
+          <div style="flex:1"><label>姓 <span style="color:#c00">*</span></label><input id="m_sei" type="text" value="${escHtml(s.sei||"")}" placeholder="例: 田中"></div>
+          <div style="flex:1"><label>名 <span style="color:#c00">*</span></label><input id="m_mei" type="text" value="${escHtml(s.mei||"")}" placeholder="例: 花子"></div>
+        </div>
         <div class="field"><label>職種</label>
           <select id="m_shokushu">
             <option value="">-- 選択 --</option>
@@ -756,15 +764,16 @@ function openStaffModal(no) {
       </div>
     </div>`;
   $("#modal-root").innerHTML = html;
-  setTimeout(() => $("#m_name")?.focus(), 50);
+  setTimeout(() => $("#m_sei")?.focus(), 50);
 }
 
 function saveStaffModal(editingNo) {
-  const name = $("#m_name").value.trim();
-  if (!name) { alert("氏名は必須です"); return; }
+  const sei = $("#m_sei").value.trim();
+  const mei = $("#m_mei").value.trim();
+  if (!sei) { alert("姓は必須です"); return; }
   const rawHours = parseFloat($("#m_hours").value);
   const data = {
-    name,
+    sei, mei,
     shokushu:     $("#m_shokushu").value.trim(),
     shikaku:      $("#m_shikaku").value.trim(),
     keitai:       $("#m_keitai").value,
@@ -789,10 +798,10 @@ function deleteStaff(no) {
   const s = state.staff.find(x => x.no === no);
   if (!s) return;
   if (!s.taishokuDate) {
-    alert(`「${s.name}」は退職日が入力されていないため削除できません。\nスタッフ編集から退職日を入力してください。`);
+    alert(`「${staffName(s)}」は退職日が入力されていないため削除できません。\nスタッフ編集から退職日を入力してください。`);
     return;
   }
-  if (!confirm(`「${s.name}」（退職日: ${s.taishokuDate}）を削除します。よろしいですか？`)) return;
+  if (!confirm(`「${staffName(s)}」（退職日: ${s.taishokuDate}）を削除します。よろしいですか？`)) return;
   state.staff = state.staff.filter(x => x.no !== no);
   // シフトも削除
   Object.keys(state.shifts).forEach(k => {
@@ -923,7 +932,7 @@ async function startAnalyze() {
       const norm = (str) => String(str).replace(/[\s　]/g, "");
       const target = norm(d.name);
       const match = state.staff.find(s => {
-        const sn = norm(s.name);
+        const sn = norm(staffName(s));
         return sn === target || sn.includes(target) || target.includes(sn);
       });
       // daily形式（新）とwork_days形式（旧）の両方に対応
@@ -1027,7 +1036,7 @@ function renderImportStep3() {
     const opts = `
       <option value="new"${m.staffNo==="new"?" selected":""}>＋ 新規登録</option>
       <option value="skip"${m.staffNo==="skip"?" selected":""}>取込まない</option>
-      ${state.staff.map(s => `<option value="${s.no}"${m.staffNo===s.no?" selected":""}>${escHtml(s.name)}</option>`).join("")}
+      ${state.staff.map(s => `<option value="${s.no}"${m.staffNo===s.no?" selected":""}>${escHtml(staffName(s))}</option>`).join("")}
     `;
     let badge;
     if (m.staffNo === "skip") badge = '<span class="badge badge-gray">除外</span>';
@@ -1173,7 +1182,7 @@ function renderKansan() {
     const h = calcMonthlyHours(s.no, y, m);
     const ks = staffKansan(s, y, m);
     return `<tr>
-      <td>${escHtml(s.name)}</td>
+      <td>${escHtml(staffName(s))}</td>
       <td><span class="badge badge-${s.keitai}">${s.keitai}</span></td>
       <td>${h} 時間</td>
       <td style="font-weight:600;color:var(--green-dark)">${ks}</td>
@@ -1287,7 +1296,7 @@ function exportExcel() {
       mkCell(s.shokushu, { ...fixSt, alignment: { horizontal: "left",   vertical: "center" } }),
       mkCell(s.keitai,   { fill: { fgColor: { rgb: clr.bg } }, font: { bold: true, sz: 10, color: { rgb: clr.fg }, name: "游ゴシック" }, alignment: { horizontal: "center", vertical: "center" }, border: border() }),
       mkCell(s.shikaku,  { ...fixSt, alignment: { horizontal: "left",   vertical: "center" } }),
-      mkCell(s.name,     { ...fixSt, font: { bold: true, sz: 10, name: "游ゴシック" }, alignment: { horizontal: "left", vertical: "center" } }),
+      mkCell(staffName(s), { ...fixSt, font: { bold: true, sz: 10, name: "游ゴシック" }, alignment: { horizontal: "left", vertical: "center" } }),
     ];
     for (let d = 1; d <= displayDays; d++) {
       const v = getShift(s.no, y, m, d);
