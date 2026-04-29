@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>訪問看護シフト管理</title>
 <script src="https://unpkg.com/lucide@0.468.0/dist/umd/lucide.min.js"></script>
+<script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
 <style>
   :root{
     --green-bg:#E1F5EE; --green-dark:#0F6E56;
@@ -269,6 +270,7 @@
       <h2 id="pageTitle">勤務形態一覧表</h2>
       <span class="period" id="period"></span>
       <button class="btn btn-ghost" onclick="switchPanel('import')"><i data-lucide="file-up"></i> PDF取込</button>
+      <button class="btn btn-ghost" onclick="exportExcel()"><i data-lucide="table"></i> Excel出力</button>
       <button class="btn btn-primary" onclick="exportPDF()"><i data-lucide="file-down"></i> PDF出力</button>
     </div>
     <div class="content">
@@ -1191,6 +1193,63 @@ function renderKansan() {
 /* =====================================================
  * データ書き出し・読み込み
  * ===================================================== */
+function exportExcel() {
+  const y = state.year, m = state.month;
+  const totalDays = daysInMonth(y, m);
+  const displayDays = state.weekMode === "4weeks" ? 28 : totalDays;
+  const allStaff = [...state.staff.filter(s => s.nurseKbn), ...state.staff.filter(s => !s.nurseKbn)];
+
+  // 週目グループ行
+  const row1 = ["No", "職種", "形態", "資格", "氏名"];
+  const merges = [];
+  let col = 5;
+  for (let d = 1; d <= displayDays; d += 7) {
+    const end = Math.min(d + 6, displayDays);
+    const weekNum = Math.ceil(d / 7);
+    row1.push(`${weekNum}週目`);
+    for (let i = 1; i < end - d + 1; i++) row1.push(null);
+    if (end > d) merges.push({ s: { r: 0, c: col }, e: { r: 0, c: col + (end - d) } });
+    col += end - d + 1;
+  }
+  row1.push("月計", "週平均", "換算");
+
+  // 日付・曜日行
+  const row2 = [null, null, null, null, null];
+  for (let d = 1; d <= displayDays; d++) {
+    row2.push(`${d}(${DOW_JA[new Date(y, m-1, d).getDay()]})`);
+  }
+  row2.push(null, null, null);
+
+  // データ行
+  const dataRows = allStaff.map(s => {
+    let totalH = 0;
+    const row = [s.no, s.shokushu, s.keitai, s.shikaku, s.name];
+    for (let d = 1; d <= displayDays; d++) {
+      const v = getShift(s.no, y, m, d);
+      if (v === "有") { row.push("有"); totalH += (s.defaultHours || 8); }
+      else if (typeof v === "number") { row.push(v); totalH += v; }
+      else row.push(null);
+    }
+    row.push(totalH, Number((totalH / displayDays * 7).toFixed(1)), staffKansan(s, y, m));
+    return row;
+  });
+
+  const wsData = [row1, row2, ...dataRows];
+  const ws = XLSX.utils.aoa_to_sheet(wsData);
+  ws["!merges"] = merges;
+
+  // 列幅設定
+  ws["!cols"] = [
+    { wch: 4 }, { wch: 10 }, { wch: 6 }, { wch: 10 }, { wch: 10 },
+    ...Array(displayDays).fill({ wch: 5 }),
+    { wch: 6 }, { wch: 7 }, { wch: 6 },
+  ];
+
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, `${y}年${m}月`);
+  XLSX.writeFile(wb, `勤務形態一覧表_${y}年${String(m).padStart(2, "0")}月.xlsx`);
+}
+
 function exportData() {
   const data = {
     version: 1,
