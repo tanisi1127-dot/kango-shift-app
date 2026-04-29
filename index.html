@@ -797,17 +797,42 @@ function saveStaffModal(editingNo) {
 function deleteStaff(no) {
   const s = state.staff.find(x => x.no === no);
   if (!s) return;
-  if (!s.taishokuDate) {
-    alert(`「${staffName(s)}」は退職日が入力されていないため削除できません。\nスタッフ編集から退職日を入力してください。`);
-    return;
-  }
-  if (!confirm(`「${staffName(s)}」（退職日: ${s.taishokuDate}）を削除します。よろしいですか？`)) return;
+  const name = staffName(s);
+  const infoRow = s.taishokuDate
+    ? `<div style="font-size:12px;color:#555;margin-top:4px">退職日: ${s.taishokuDate}</div>`
+    : `<div style="font-size:12px;color:#c00;margin-top:4px">退職日が未入力です</div>`;
+  const html = `
+    <div class="modal-bg" onclick="if(event.target===this) closeModal()">
+      <div class="modal" style="max-width:360px">
+        <h3 style="color:#c00">スタッフ削除</h3>
+        <p style="margin:8px 0">「<strong>${escHtml(name)}</strong>」を削除します。</p>
+        ${infoRow}
+        <div class="field-check" style="margin-top:14px;padding:10px;background:#FFF3E0;border-radius:6px;border:1px solid #FFCC80">
+          <input type="checkbox" id="demoDeleteChk">
+          <label for="demoDeleteChk" style="color:#E65100;font-weight:600">デモのため削除（退職日なしで削除）</label>
+        </div>
+        <div class="modal-actions" style="margin-top:16px">
+          <button class="btn btn-ghost" onclick="closeModal()">キャンセル</button>
+          <button id="confirmDeleteBtn" class="btn" style="background:#c00;color:#fff;opacity:${s.taishokuDate?1:0.4}" ${s.taishokuDate?"":"disabled"} onclick="confirmDeleteStaff(${no})">削除する</button>
+        </div>
+      </div>
+    </div>`;
+  $("#modal-root").innerHTML = html;
+  $("#demoDeleteChk").addEventListener("change", e => {
+    const btn = $("#confirmDeleteBtn");
+    const enabled = s.taishokuDate || e.target.checked;
+    btn.disabled = !enabled;
+    btn.style.opacity = enabled ? 1 : 0.4;
+  });
+}
+
+function confirmDeleteStaff(no) {
   state.staff = state.staff.filter(x => x.no !== no);
-  // シフトも削除
   Object.keys(state.shifts).forEach(k => {
     if (k.startsWith(no + "_")) delete state.shifts[k];
   });
   saveData();
+  closeModal();
   renderActivePanel();
 }
 
