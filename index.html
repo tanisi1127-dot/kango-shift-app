@@ -1,0 +1,1251 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>訪問看護シフト管理</title>
+<script src="https://unpkg.com/lucide@0.468.0/dist/umd/lucide.min.js"></script>
+<style>
+  :root{
+    --green-bg:#E1F5EE; --green-dark:#0F6E56;
+    --blue-bg:#E6F1FB;  --blue-dark:#185FA5;
+    --amber-bg:#FAEEDA; --amber-dark:#854F0B;
+    --gray-bg:#F1EFE8;  --gray-dark:#5F5E5A;
+    --red-bg:#FCEBEB;   --red-dark:#A32D2D;
+    --leave-bg:#EAF3DE; --leave-dark:#3B6D11;
+    --border:#E0E0E0;
+    --text:#333;
+    --text-muted:#888;
+    --sidebar-bg:#F7F7F5;
+    --header-bg:#E8F4F8;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%}
+  body{
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Hiragino Sans","Yu Gothic","Meiryo",sans-serif;
+    color:var(--text);font-size:13px;background:#fafafa;
+  }
+  .layout{display:flex;height:100vh;overflow:hidden}
+  /* Sidebar */
+  .sidebar{
+    width:200px;flex-shrink:0;background:var(--sidebar-bg);
+    border-right:1px solid var(--border);padding:16px 12px;overflow-y:auto;
+  }
+  .sidebar h1{font-size:14px;margin-bottom:14px;line-height:1.3}
+  .nav-item{
+    display:flex;align-items:center;gap:8px;padding:8px 10px;margin-bottom:3px;
+    border-radius:6px;cursor:pointer;font-size:13px;color:var(--text);
+  }
+  .nav-item:hover{background:rgba(0,0,0,0.05)}
+  .nav-item.active{background:#333;color:#fff}
+  .sidebar-section{margin-top:18px;padding-top:14px;border-top:1px solid var(--border)}
+  .sidebar-section label{font-size:11px;color:var(--text-muted);display:block;margin-bottom:3px;margin-top:6px}
+  .sidebar-section select,.sidebar-section input{
+    width:100%;padding:6px 8px;border:1px solid var(--border);
+    border-radius:4px;font-size:12px;background:#fff;font-family:inherit;
+  }
+  /* Main */
+  .main{flex:1;display:flex;flex-direction:column;overflow:hidden;min-width:0}
+  .topbar{
+    display:flex;align-items:center;gap:10px;padding:10px 18px;
+    border-bottom:1px solid var(--border);background:#fff;flex-shrink:0;
+  }
+  .topbar h2{font-size:16px;flex:1}
+  .topbar .period{color:var(--text-muted);font-size:12px;margin-right:8px}
+  /* Buttons */
+  .btn{border:none;padding:7px 14px;border-radius:6px;cursor:pointer;font-size:12px;font-weight:500;font-family:inherit}
+  .btn-primary{background:#333;color:#fff}
+  .btn-primary:hover{background:#555}
+  .btn-ghost{background:transparent;border:1px solid var(--border);color:var(--text)}
+  .btn-ghost:hover{background:#f5f5f5}
+  .btn-green{background:var(--green-dark);color:#fff}
+  .btn-green:hover{background:#0a5a45}
+  .btn-red{background:var(--red-dark);color:#fff}
+  .btn-sm{padding:4px 9px;font-size:11px}
+  .btn:disabled{opacity:.4;cursor:not-allowed}
+  /* Content / panels */
+  .content{flex:1;overflow:auto;padding:18px}
+  .panel{display:none}
+  .panel.active{display:block}
+  /* Badges */
+  .badge{padding:2px 7px;border-radius:4px;font-size:11px;font-weight:600;display:inline-block}
+  .badge-A{background:var(--green-bg);color:var(--green-dark)}
+  .badge-B{background:var(--blue-bg);color:var(--blue-dark)}
+  .badge-C{background:var(--amber-bg);color:var(--amber-dark)}
+  .badge-D{background:var(--gray-bg);color:var(--gray-dark)}
+  .badge-green{background:var(--green-bg);color:var(--green-dark)}
+  .badge-red{background:var(--red-bg);color:var(--red-dark)}
+  .badge-blue{background:var(--blue-bg);color:var(--blue-dark)}
+  .badge-gray{background:var(--gray-bg);color:var(--gray-dark)}
+  /* Shift table */
+  .shift-wrapper{background:#fff;border:1px solid var(--border);border-radius:8px;overflow:auto}
+  table.shift{border-collapse:collapse;font-size:11px;white-space:nowrap}
+  table.shift th,table.shift td{border:1px solid var(--border);padding:0;text-align:center}
+  table.shift thead th{background:var(--header-bg);font-weight:600;padding:4px 2px;line-height:1.2}
+  table.shift td{height:30px}
+  table.shift td.shift-cell{cursor:pointer;user-select:none;font-weight:600}
+  table.shift td.shift-cell:hover{outline:2px solid #333;outline-offset:-2px;position:relative;z-index:1}
+  table.shift td.txt{padding:0 4px;text-align:left;font-size:11px}
+  table.shift td.txt-c{padding:0 2px;text-align:center;font-size:11px}
+  .cell-A{background:var(--green-bg);color:var(--green-dark)}
+  .cell-B{background:var(--blue-bg);color:var(--blue-dark)}
+  .cell-C{background:var(--amber-bg);color:var(--amber-dark)}
+  .cell-D{background:var(--gray-bg);color:var(--gray-dark)}
+  .cell-leave{background:var(--leave-bg);color:var(--leave-dark)}
+  .cell-off{background:#fff;color:#ccc}
+  .cell-off.sat{background:#F0F4FF}
+  .cell-off.sun{background:#FFF0F0}
+  th.day-sun,td.day-sun{color:#CC0000}
+  th.day-sat,td.day-sat{color:#0055CC}
+  th.sat-bg{background:#DDE9FB !important}
+  th.sun-bg{background:#FBDDDD !important}
+  tr.divider td{border-top:2px solid #333 !important}
+  tr.totals td{background:#f0f0f0;font-weight:700}
+  .total-ok{color:var(--green-dark)}
+  .total-ng{color:var(--red-dark)}
+  th.week-group{background:#C8E6C9 !important;font-size:11px;padding:3px 2px;border-bottom:2px solid #81C784}
+  th.week-group+th.week-group,td.week-sep{border-left:2px solid #4CAF50 !important}
+  th.week-sep{border-left:2px solid #4CAF50 !important}
+  .shift-toolbar{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:6px;flex-wrap:wrap}
+  .shift-toolbar .note-inline{font-size:11px;color:#555}
+  /* Staff cards */
+  .cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:10px}
+  .card{background:#fff;border:1px solid var(--border);border-radius:8px;padding:10px 12px;display:flex;gap:10px;align-items:center}
+  .avatar{width:38px;height:38px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:13px;flex-shrink:0}
+  .card-info{flex:1;min-width:0}
+  .card-name{font-weight:700;font-size:13px;margin-bottom:2px}
+  .card-sub{font-size:11px;color:var(--text-muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .card-actions{display:flex;gap:4px;flex-direction:column}
+  /* KPI */
+  .kpi-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:18px}
+  .kpi{background:#fff;border:1px solid var(--border);border-radius:8px;padding:14px 16px}
+  .kpi-label{font-size:11px;color:var(--text-muted);margin-bottom:4px}
+  .kpi-value{font-size:24px;font-weight:700}
+  .kpi.ok .kpi-value{color:var(--green-dark)}
+  .kpi.ng .kpi-value{color:var(--red-dark)}
+  /* Check items */
+  .checks{display:flex;flex-direction:column;gap:8px;margin-bottom:18px}
+  .check{background:#fff;border:1px solid var(--border);border-radius:8px;padding:10px 14px;display:flex;gap:12px;align-items:center}
+  .check-icon{width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:12px;flex-shrink:0}
+  .check.ok .check-icon{background:var(--green-dark)}
+  .check.ng .check-icon{background:var(--red-dark)}
+  .check-title{font-weight:600;font-size:13px}
+  .check-desc{font-size:11px;color:var(--text-muted)}
+  /* Steps */
+  .steps-bar{display:flex;align-items:center;margin-bottom:18px;gap:6px;flex-wrap:wrap}
+  .step{display:flex;align-items:center;gap:6px;padding:5px 12px;border-radius:16px;font-size:12px;background:#eee;color:var(--text-muted)}
+  .step.active{background:#333;color:#fff}
+  .step.done{background:var(--green-dark);color:#fff}
+  .step-num{width:18px;height:18px;border-radius:50%;background:rgba(255,255,255,0.3);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:10px}
+  .step.pending .step-num{background:rgba(0,0,0,0.1)}
+  .step-arrow{color:#bbb;font-size:14px}
+  /* Drop area */
+  .drop-area{
+    border:2px dashed var(--border);border-radius:8px;padding:36px;text-align:center;background:#fff;cursor:pointer;
+  }
+  .drop-area:hover,.drop-area.drag{border-color:#333;background:#fafafa}
+  .drop-area.has-file{border-style:solid;border-color:var(--green-dark);background:var(--green-bg)}
+  .drop-area input[type=file]{display:none}
+  /* Progress / log */
+  .progress{height:8px;background:#eee;border-radius:4px;overflow:hidden;margin-bottom:14px}
+  .progress-bar{height:100%;background:var(--green-dark);transition:width .3s;width:0%}
+  .log{background:#1e1e1e;color:#d4d4d4;padding:12px;border-radius:8px;font-family:Consolas,monospace;font-size:11px;height:160px;overflow-y:auto;white-space:pre-wrap}
+  .log .ok{color:#4ade80}
+  .log .err{color:#f87171}
+  .log .info{color:#93c5fd}
+  /* Modal */
+  .modal-bg{position:fixed;inset:0;background:rgba(0,0,0,0.4);display:flex;align-items:center;justify-content:center;z-index:100}
+  .modal{background:#fff;border-radius:8px;padding:20px;min-width:340px;max-width:95%;max-height:90vh;overflow:auto}
+  .modal h3{margin-bottom:14px;font-size:15px}
+  .field{margin-bottom:10px}
+  .field label{display:block;font-size:11px;color:var(--text-muted);margin-bottom:3px}
+  .field input,.field select{width:100%;padding:7px 8px;border:1px solid var(--border);border-radius:4px;font-size:13px;font-family:inherit}
+  .field-check{display:flex;align-items:center;gap:6px;margin:8px 0}
+  .field-check label{font-size:13px;color:var(--text)}
+  .modal-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:16px}
+  /* Generic table */
+  table.gen{width:100%;border-collapse:collapse;font-size:12px;background:#fff;border:1px solid var(--border);border-radius:8px;overflow:hidden}
+  table.gen th,table.gen td{border-bottom:1px solid var(--border);padding:8px 10px;text-align:left}
+  table.gen th{background:var(--header-bg);font-weight:600}
+  table.gen tr:last-child td{border-bottom:none}
+  .section-title{font-size:14px;font-weight:600;margin:0 0 8px}
+  .sec{margin-bottom:18px}
+  .note{font-size:11px;color:var(--text-muted);margin-bottom:8px}
+  .three-up{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:14px}
+  .stat{background:#fff;border:1px solid var(--border);border-radius:8px;padding:10px 14px}
+  .stat .v{font-size:20px;font-weight:700}
+  .stat .l{font-size:11px;color:var(--text-muted)}
+  .complete{text-align:center;padding:40px 20px;background:#fff;border-radius:8px;border:1px solid var(--border)}
+  .complete .icon{width:60px;height:60px;border-radius:50%;background:var(--green-dark);color:#fff;display:flex;align-items:center;justify-content:center;font-size:28px;margin:0 auto 14px}
+  .empty{padding:30px;text-align:center;color:var(--text-muted);font-size:12px;background:#fff;border:1px dashed var(--border);border-radius:8px}
+  /* Lucide icons */
+  svg.lucide{display:inline-block;vertical-align:middle;flex-shrink:0}
+  .nav-item svg.lucide{width:15px;height:15px}
+  .btn svg.lucide{width:14px;height:14px;margin-right:4px}
+  .check-icon svg.lucide{width:13px;height:13px}
+  .icon svg.lucide{width:28px;height:28px}
+
+  /* ====== 印刷専用スタイル ====== */
+  #print-header{display:none}
+  @media print{
+    @page{size:A4 landscape;margin:8mm 6mm}
+    html,body{height:auto;overflow:visible}
+    .layout{display:block;height:auto;overflow:visible}
+    .sidebar,.topbar,.modal-bg,#modal-root,.note{display:none!important}
+    .main{overflow:visible}
+    .content{overflow:visible;padding:0}
+    .panel{display:none!important}
+    .panel.active{display:block!important}
+    /* 印刷ヘッダー */
+    #print-header{
+      display:block;
+      margin-bottom:4mm;
+      font-family:"Meiryo","Yu Gothic","Hiragino Sans",sans-serif;
+    }
+    #print-header .ph-title{font-size:10pt;font-weight:700;margin-bottom:1mm}
+    #print-header .ph-sub{font-size:8.5pt;color:#444}
+    /* シフト表 */
+    .shift-wrapper{border:none;overflow:visible}
+    table.shift{font-size:7pt;width:100%;border-collapse:collapse}
+    table.shift th,table.shift td{border:0.3pt solid #bbb;padding:0}
+    table.shift td{height:7mm}
+    table.shift thead th{background:#E8F4F8!important;-webkit-print-color-adjust:exact;print-color-adjust:exact;font-size:7pt}
+    /* セル背景を印刷で出す */
+    .cell-A{background:#E1F5EE!important;color:#0F6E56!important;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+    .cell-B{background:#E6F1FB!important;color:#185FA5!important;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+    .cell-C{background:#FAEEDA!important;color:#854F0B!important;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+    .cell-D{background:#F1EFE8!important;color:#5F5E5A!important;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+    .cell-leave{background:#EAF3DE!important;color:#3B6D11!important;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+    .cell-off.sat{background:#F0F4FF!important;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+    .cell-off.sun{background:#FFF0F0!important;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+    th.sat-bg{background:#DDE9FB!important;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+    th.sun-bg{background:#FBDDDD!important;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+    tr.totals td{background:#f0f0f0!important;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+    /* 常勤換算パネル */
+    .kpi-grid{grid-template-columns:1fr 1fr;gap:6mm}
+    .kpi{border:0.5pt solid #ddd}
+    .checks{gap:4mm}
+    .check{border:0.5pt solid #ddd;padding:4mm 6mm}
+    /* 換算後注釈 */
+    #shift-kansan-note{display:block!important;margin-top:3mm;font-size:8pt}
+  }
+</style>
+</head>
+<body>
+<div id="print-header">
+  <div class="ph-title">（参考様式）従業者の勤務の体制及び勤務形態一覧表　サービス種別：訪問看護</div>
+  <div class="ph-sub" id="ph-sub"></div>
+</div>
+<div class="layout">
+  <aside class="sidebar">
+    <h1>訪問看護シフト管理</h1>
+    <nav id="nav">
+      <div class="nav-item active" data-panel="shift"><i data-lucide="table-2"></i> 勤務形態一覧表</div>
+      <div class="nav-item" data-panel="staff"><i data-lucide="users"></i> スタッフ管理</div>
+      <div class="nav-item" data-panel="import"><i data-lucide="file-up"></i> PDF取込</div>
+      <div class="nav-item" data-panel="kansan"><i data-lucide="calculator"></i> 常勤換算・基準</div>
+    </nav>
+    <div class="sidebar-section">
+      <label>年</label>
+      <select id="yearSel"></select>
+      <label>月</label>
+      <select id="monthSel"></select>
+      <label>事業所名</label>
+      <input id="jigyoshoInp" type="text" placeholder="○○訪問看護ステーション" />
+      <label style="margin-top:10px">Anthropic APIキー</label>
+      <input id="apiKeyInp" type="password" placeholder="sk-ant-..." style="font-size:10px" />
+      <div id="apiKeyStatus" style="font-size:10px;margin-top:3px"></div>
+    </div>
+  </aside>
+  <main class="main">
+    <div class="topbar">
+      <h2 id="pageTitle">勤務形態一覧表</h2>
+      <span class="period" id="period"></span>
+      <button class="btn btn-ghost" onclick="switchPanel('import')"><i data-lucide="file-up"></i> PDF取込</button>
+      <button class="btn btn-primary" onclick="exportPDF()"><i data-lucide="file-down"></i> PDF出力</button>
+    </div>
+    <div class="content">
+      <section class="panel active" id="panel-shift"></section>
+      <section class="panel" id="panel-staff"></section>
+      <section class="panel" id="panel-import"></section>
+      <section class="panel" id="panel-kansan"></section>
+    </div>
+  </main>
+</div>
+<div id="modal-root"></div>
+
+<script>
+"use strict";
+
+/* =====================================================
+ * 定数 / 既定データ
+ * ===================================================== */
+
+const STORAGE = {
+  staff:    "kango_staff",
+  shifts:   "kango_shifts",
+  jigyosho: "kango_jigyosho",
+  apiKey:   "kango_apiKey",
+  ym:       "kango_ym",
+};
+
+const STD_HOURS = 176;
+const HOURS_PER_DAY = 8;
+
+const DEFAULT_STAFF = [
+  { no:1, name:"田中 花子", keitai:"A", shokushu:"管理者・看護師", shikaku:"保健師",     kanrisha:true,  nurseKbn:true,  defaultHours:8 },
+  { no:2, name:"佐藤 明美", keitai:"A", shokushu:"看護師",         shikaku:"看護師",     kanrisha:false, nurseKbn:true,  defaultHours:8 },
+  { no:3, name:"鈴木 理恵", keitai:"A", shokushu:"看護師",         shikaku:"准看護師",   kanrisha:false, nurseKbn:true,  defaultHours:8 },
+  { no:4, name:"山田 由美", keitai:"C", shokushu:"看護師",         shikaku:"准看護師",   kanrisha:false, nurseKbn:true,  defaultHours:6 },
+  { no:5, name:"伊藤 一郎", keitai:"A", shokushu:"理学療法士",     shikaku:"理学療法士", kanrisha:false, nurseKbn:false, defaultHours:8 },
+];
+
+const KEITAI_AVATAR = { A:"#4ECDC4", B:"#3498DB", C:"#F39C12", D:"#95A5A6" };
+const DOW_JA = ["日","月","火","水","木","金","土"];
+
+const PANEL_TITLES = {
+  shift:  "勤務形態一覧表",
+  staff:  "スタッフ管理",
+  import: "PDF取込",
+  kansan: "常勤換算・基準",
+};
+
+/* =====================================================
+ * 状態
+ * ===================================================== */
+const state = {
+  staff: [],
+  shifts: {},          // { "no_year_month": { day: "A"|"B"|"C"|"D"|"休"|"有" } }
+  year: new Date().getFullYear(),
+  month: new Date().getMonth() + 1,
+  panel: "shift",
+  jigyosho: "○○訪問看護ステーション",
+  apiKey: "",
+  importStep: 1,
+  importFile: null,
+  importResult: null,
+  importMappings: [],
+  modal: null,
+  weekMode: "reki",
+};
+
+/* =====================================================
+ * ユーティリティ
+ * ===================================================== */
+const $  = (sel, root=document) => root.querySelector(sel);
+const $$ = (sel, root=document) => Array.from(root.querySelectorAll(sel));
+const escHtml = (s="") => String(s).replace(/[&<>"']/g, c => ({
+  "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;",
+})[c]);
+
+function daysInMonth(y, m) { return new Date(y, m, 0).getDate(); }
+function shiftKey(no, y, m) { return `${no}_${y}_${m}`; }
+
+function getShift(no, y, m, d) {
+  const sh = state.shifts[shiftKey(no, y, m)];
+  if (!sh) return "休";
+  const v = sh[d] ?? "休";
+  // 旧形式（A/B/C/D）との後方互換: スタッフの defaultHours に変換
+  if (v === "A" || v === "B" || v === "C" || v === "D") {
+    const s = state.staff.find(x => x.no === no);
+    return s ? (s.defaultHours || 8) : 8;
+  }
+  return v;
+}
+
+function getDefaultHours(no) {
+  const s = state.staff.find(x => x.no === no);
+  return s ? (s.defaultHours || 8) : 8;
+}
+function setShift(no, y, m, d, v) {
+  const k = shiftKey(no, y, m);
+  if (!state.shifts[k]) state.shifts[k] = {};
+  state.shifts[k][d] = v;
+}
+
+/* =====================================================
+ * 永続化
+ * ===================================================== */
+function loadData() {
+  try {
+    const s = localStorage.getItem(STORAGE.staff);
+    state.staff = s ? JSON.parse(s) : DEFAULT_STAFF.map(x => ({...x}));
+  } catch { state.staff = DEFAULT_STAFF.map(x => ({...x})); }
+
+  try {
+    const sh = localStorage.getItem(STORAGE.shifts);
+    state.shifts = sh ? JSON.parse(sh) : {};
+  } catch { state.shifts = {}; }
+
+  state.jigyosho = localStorage.getItem(STORAGE.jigyosho) || "○○訪問看護ステーション";
+  state.apiKey   = localStorage.getItem(STORAGE.apiKey) || "";
+
+  try {
+    const ym = JSON.parse(localStorage.getItem(STORAGE.ym) || "null");
+    if (ym && ym.year && ym.month) { state.year = ym.year; state.month = ym.month; }
+  } catch {}
+}
+
+function saveData() {
+  localStorage.setItem(STORAGE.staff,    JSON.stringify(state.staff));
+  localStorage.setItem(STORAGE.shifts,   JSON.stringify(state.shifts));
+  localStorage.setItem(STORAGE.jigyosho, state.jigyosho);
+  localStorage.setItem(STORAGE.apiKey,   state.apiKey);
+  localStorage.setItem(STORAGE.ym,       JSON.stringify({year:state.year, month:state.month}));
+}
+
+/* =====================================================
+ * 初期シフト生成
+ * ===================================================== */
+function ensureShiftsForMonth(y, m) {
+  const days = daysInMonth(y, m);
+  for (const s of state.staff) {
+    const k = shiftKey(s.no, y, m);
+    if (state.shifts[k]) continue;
+    const obj = {};
+    let toggle = 0;
+    for (let d = 1; d <= days; d++) {
+      const dow = new Date(y, m - 1, d).getDay();
+      if (dow === 0 || dow === 6) {
+        obj[d] = "休";
+      } else if (s.keitai === "C" || s.keitai === "D") {
+        obj[d] = (toggle++ % 2 === 0) ? (s.defaultHours || 8) : "休";
+      } else {
+        obj[d] = s.defaultHours || 8;
+      }
+    }
+    state.shifts[k] = obj;
+  }
+}
+
+/* =====================================================
+ * 計算
+ * ===================================================== */
+function calcMonthlyHours(no, y, m) {
+  const days = daysInMonth(y, m);
+  const dh = getDefaultHours(no);
+  let h = 0;
+  for (let d = 1; d <= days; d++) {
+    const v = getShift(no, y, m, d);
+    if (v === "休") continue;
+    if (v === "有") { h += dh; continue; }   // 有給は標準時間でカウント
+    h += (typeof v === "number") ? v : dh;
+  }
+  return h;
+}
+
+function calcKansan(y, m) {
+  const nurses = state.staff.filter(s => s.nurseKbn);
+  const jokin = nurses.filter(s => s.keitai === "A" || s.keitai === "B").length;
+  const hijokinH = nurses
+    .filter(s => s.keitai === "C" || s.keitai === "D")
+    .reduce((sum, s) => sum + calcMonthlyHours(s.no, y, m), 0);
+  const hijokinK = Math.floor(hijokinH / STD_HOURS * 10) / 10;
+  const total = Math.floor((jokin + hijokinK) * 10) / 10;
+  return { jokin, hijokinH, hijokinK, total, nurseCount: nurses.length };
+}
+
+function staffKansan(s, y, m) {
+  if (!s.nurseKbn) return "—";
+  if (s.keitai === "A" || s.keitai === "B") return "1.0";
+  const h = calcMonthlyHours(s.no, y, m);
+  return (Math.floor(h / STD_HOURS * 10) / 10).toFixed(1);
+}
+
+function checkKijun(y, m) {
+  const { total } = calcKansan(y, m);
+  const jokinNurse = state.staff.filter(s => s.nurseKbn && (s.keitai === "A" || s.keitai === "B")).length;
+  const hasMgr = state.staff.some(s => s.kanrisha);
+  return [
+    { ok: total >= 2.5,    title:"① 看護職員 常勤換算2.5人以上の配置",        desc:`現在 ${total.toFixed(1)} 人（基準：2.5人以上）` },
+    { ok: jokinNurse >= 1, title:"② 看護職員のうち1名は常勤であること",       desc:`常勤看護職員：${jokinNurse}名（A・B形態）` },
+    { ok: hasMgr,          title:"③ 管理者（保健師または看護師）の配置",      desc: hasMgr ? "保健師または看護師が管理者として配置済み" : "未設定" },
+    { ok: true,            title:"④ 理学療法士等の配置（実情に応じた適当数）",desc:"配置されている場合は一覧表に記載" },
+    { ok: true,            title:"⑤ 勤務形態一覧表の作成・保管",              desc:"毎月作成し2年間保管が必要" },
+  ];
+}
+
+/* =====================================================
+ * パネル切替
+ * ===================================================== */
+function switchPanel(name) {
+  state.panel = name;
+  $$(".nav-item").forEach(el => el.classList.toggle("active", el.dataset.panel === name));
+  $$(".panel").forEach(el => el.classList.toggle("active", el.id === `panel-${name}`));
+  $("#pageTitle").textContent = PANEL_TITLES[name] || "";
+  renderActivePanel();
+}
+
+function refreshIcons() {
+  if (window.lucide) lucide.createIcons();
+}
+
+function renderActivePanel() {
+  const days = daysInMonth(state.year, state.month);
+  $("#period").textContent = `${state.year}年${state.month}月（${days}日間）`;
+  switch (state.panel) {
+    case "shift":  renderShift();  break;
+    case "staff":  renderStaff();  break;
+    case "import": renderImport(); break;
+    case "kansan": renderKansan(); break;
+  }
+  refreshIcons();
+}
+
+function renderAll() {
+  $("#yearSel").value  = state.year;
+  $("#monthSel").value = state.month;
+  $("#jigyoshoInp").value = state.jigyosho;
+  $("#apiKeyInp").value = state.apiKey;
+  const st = $("#apiKeyStatus");
+  if (state.apiKey) { st.textContent = "✓ 設定済み"; st.style.color = "var(--green-dark)"; }
+  else              { st.textContent = "未設定（PDF取込に必要）"; st.style.color = "#c00"; }
+  ensureShiftsForMonth(state.year, state.month);
+  renderActivePanel();
+}
+
+/* =====================================================
+ * 勤務形態一覧表
+ * ===================================================== */
+function cellClass(keitai, v, dow) {
+  if (v === "有") return "shift-cell cell-leave";
+  if (v === "休") {
+    if (dow === 0) return "shift-cell cell-off sun";
+    if (dow === 6) return "shift-cell cell-off sat";
+    return "shift-cell cell-off";
+  }
+  // 勤務（数値）: スタッフのkeitaiで色付け
+  return `shift-cell cell-${keitai}`;
+}
+
+function renderShift() {
+  const y = state.year, m = state.month;
+  const totalDays = daysInMonth(y, m);
+  const displayDays = state.weekMode === "4weeks" ? 28 : totalDays;
+  const nurses = state.staff.filter(s => s.nurseKbn);
+  const others = state.staff.filter(s => !s.nurseKbn);
+
+  // 週目グループヘッダーを構築（7日ずつ）
+  const weeks = [];
+  for (let start = 1; start <= displayDays; start += 7) {
+    weeks.push({ start, end: Math.min(start + 6, displayDays) });
+  }
+  const weekGroupCells = weeks.map((w, i) =>
+    `<th colspan="${w.end - w.start + 1}" class="week-group">${i + 1}週目</th>`
+  ).join("");
+
+  let dayHeads = "";
+  for (let d = 1; d <= displayDays; d++) {
+    const dow = new Date(y, m-1, d).getDay();
+    const sepCls = (d > 1 && (d - 1) % 7 === 0) ? " week-sep" : "";
+    const cls = (dow === 0 ? "day-sun sun-bg" : dow === 6 ? "day-sat sat-bg" : "") + sepCls;
+    dayHeads += `<th class="${cls}" style="width:24px"><div>${d}</div><div style="font-size:9px">${DOW_JA[dow]}</div></th>`;
+  }
+
+  function rowHtml(s, divider) {
+    let totalH = 0;
+    let cells = "";
+    for (let d = 1; d <= displayDays; d++) {
+      const v = getShift(s.no, y, m, d);
+      const dow = new Date(y, m-1, d).getDay();
+      const cls = cellClass(s.keitai, v, dow);
+      let txt = "";
+      if (v === "有") { txt = "有"; totalH += (s.defaultHours || 8); }
+      else if (typeof v === "number") { txt = v % 1 === 0 ? String(v) : v.toFixed(1); totalH += v; }
+      const sepCls = (d > 1 && (d - 1) % 7 === 0) ? " week-sep" : "";
+      cells += `<td class="${cls}${sepCls}" data-no="${s.no}" data-day="${d}" style="font-size:10px">${txt}</td>`;
+    }
+    const kansan = staffKansan(s, y, m);
+    const weekAvg = (totalH / displayDays * 7).toFixed(1);
+    return `<tr${divider ? ' class="divider"' : ""}>
+      <td class="txt-c" style="width:28px">${s.no}</td>
+      <td class="txt"   style="width:90px">${escHtml(s.shokushu)}</td>
+      <td class="txt-c" style="width:38px"><span class="badge badge-${s.keitai}">${s.keitai}</span></td>
+      <td class="txt"   style="width:70px">${escHtml(s.shikaku)}</td>
+      <td class="txt"   style="width:90px;font-weight:700">${escHtml(s.name)}</td>
+      ${cells}
+      <td class="txt-c" style="width:50px;font-weight:600">${totalH}h</td>
+      <td class="txt-c" style="width:46px;font-size:10px;color:#666">${weekAvg}h</td>
+      <td class="txt-c" style="width:46px;font-weight:700;color:#0F6E56">${kansan}</td>
+    </tr>`;
+  }
+
+  const k = calcKansan(y, m);
+  const totalsRow = `<tr class="totals">
+    <td colspan="5" class="txt" style="padding:0 8px">看護職員　常勤換算合計</td>
+    <td colspan="${displayDays}" class="txt" style="text-align:right;padding-right:8px;font-size:10px;color:#666">
+      常勤(A･B): ${k.jokin}名 ／ 非常勤(C･D)月間時間: ${k.hijokinH}h ／ 非常勤換算: ${k.hijokinK.toFixed(1)}名
+    </td>
+    <td class="txt-c" style="font-size:13px" colspan="3"><span class="${k.total>=2.5?'total-ok':'total-ng'}">${k.total.toFixed(1)} 名</span></td>
+  </tr>`;
+
+  let body = "";
+  nurses.forEach((s,i) => body += rowHtml(s, false));
+  others.forEach((s,i) => body += rowHtml(s, i === 0));
+  body += totalsRow;
+
+  const html = `
+    <div class="shift-toolbar">
+      <span class="note-inline">セルをクリック: 休 → 標準時間（勤務） → 有給 → 休 の順に切り替わります。右クリックで時間数を直接入力できます。</span>
+      <label style="font-size:12px;font-weight:600;white-space:nowrap">表示期間:
+        <select id="weekModeSel" style="margin-left:4px;font-size:12px;padding:2px 6px">
+          <option value="reki"${state.weekMode==="reki"?" selected":""}>歴月</option>
+          <option value="4weeks"${state.weekMode==="4weeks"?" selected":""}>4週</option>
+        </select>
+      </label>
+    </div>
+    <div class="shift-wrapper">
+      <table class="shift">
+        <thead>
+          <tr>
+            <th rowspan="2" style="width:28px">No</th>
+            <th rowspan="2" style="width:90px">職種</th>
+            <th rowspan="2" style="width:38px">形態</th>
+            <th rowspan="2" style="width:70px">資格</th>
+            <th rowspan="2" style="width:90px">氏名</th>
+            ${weekGroupCells}
+            <th rowspan="2" style="width:50px">月計</th>
+            <th rowspan="2" style="width:46px">週平均</th>
+            <th rowspan="2" style="width:46px">換算</th>
+          </tr>
+          <tr>${dayHeads}</tr>
+        </thead>
+        <tbody>${body}</tbody>
+      </table>
+    </div>
+    <div style="margin-top:10px;font-size:12px;${k.total>=2.5?"color:var(--green-dark)":"color:var(--red-dark);font-weight:600"}">
+      ${k.total>=2.5 ? '<i data-lucide="circle-check" style="vertical-align:middle;margin-right:4px"></i>看護職員の常勤換算が基準（2.5人以上）を満たしています' : '<i data-lucide="triangle-alert" style="vertical-align:middle;margin-right:4px"></i>看護職員の常勤換算が基準（2.5人以上）を下回っています'}
+    </div>
+  `;
+
+  const root = $("#panel-shift");
+  root.innerHTML = html;
+
+  // 表示期間切替
+  $("#weekModeSel").addEventListener("change", e => {
+    state.weekMode = e.target.value;
+    renderShift();
+    refreshIcons();
+  });
+
+  // クリックハンドラ（左クリック: 休→標準時間→有→休 サイクル）
+  root.querySelectorAll("td.shift-cell").forEach(td => {
+    td.addEventListener("click", () => {
+      const no  = Number(td.dataset.no);
+      const d   = Number(td.dataset.day);
+      const cur = getShift(no, y, m, d);
+      const dh  = getDefaultHours(no);
+      let next;
+      if (cur === "休") next = dh;
+      else if (cur === "有") next = "休";
+      else next = "有"; // 数値→有
+      setShift(no, y, m, d, next);
+      saveData();
+      renderShift();
+      refreshIcons();
+    });
+    // 右クリック: 時間数を直接入力
+    td.addEventListener("contextmenu", e => {
+      e.preventDefault();
+      const no  = Number(td.dataset.no);
+      const d   = Number(td.dataset.day);
+      const cur = getShift(no, y, m, d);
+      const curH = (typeof cur === "number") ? cur : getDefaultHours(no);
+      const input = prompt(`${d}日の勤務時間数を入力してください（空欄=休、「有」=有給）`, cur === "休" ? "" : cur === "有" ? "有" : curH);
+      if (input === null) return;
+      const trimmed = input.trim();
+      let next;
+      if (trimmed === "" || trimmed === "休") next = "休";
+      else if (trimmed === "有") next = "有";
+      else {
+        const n = parseFloat(trimmed);
+        next = isNaN(n) ? "休" : n;
+      }
+      setShift(no, y, m, d, next);
+      saveData();
+      renderShift();
+      refreshIcons();
+    });
+  });
+}
+
+/* =====================================================
+ * スタッフ管理
+ * ===================================================== */
+function renderStaff() {
+  const root = $("#panel-staff");
+  let cards = "";
+  for (const s of state.staff) {
+    const initial = (s.name || "?").trim().charAt(0);
+    const color = KEITAI_AVATAR[s.keitai] || "#888";
+    const tags = [];
+    if (s.kanrisha) tags.push('<span class="badge badge-blue">管理者</span>');
+    if (s.nurseKbn) tags.push('<span class="badge badge-green">看護職員</span>');
+    cards += `<div class="card">
+      <div class="avatar" style="background:${color}">${escHtml(initial)}</div>
+      <div class="card-info">
+        <div class="card-name">${escHtml(s.name)} <span class="badge badge-${s.keitai}">${s.keitai}</span></div>
+        <div class="card-sub">${escHtml(s.shokushu || "")} ／ ${escHtml(s.shikaku || "")}</div>
+        <div style="margin-top:4px">${tags.join(" ")} <span class="badge badge-gray">標準 ${s.defaultHours || 8}h/日</span></div>
+      </div>
+      <div class="card-actions">
+        <button class="btn btn-ghost btn-sm" onclick="openStaffModal(${s.no})">編集</button>
+        <button class="btn btn-ghost btn-sm" onclick="deleteStaff(${s.no})">削除</button>
+      </div>
+    </div>`;
+  }
+  root.innerHTML = `
+    <div style="display:flex;align-items:center;margin-bottom:12px;gap:10px">
+      <span class="note" style="margin:0;flex:1">スタッフ数: ${state.staff.length}名</span>
+      <button class="btn btn-primary" onclick="openStaffModal()">＋ スタッフ追加</button>
+    </div>
+    <div class="cards">${cards || '<div class="empty">スタッフが登録されていません。</div>'}</div>
+  `;
+}
+
+function openStaffModal(no) {
+  const editing = state.staff.find(s => s.no === no);
+  const s = editing || { no:0, name:"", keitai:"A", shokushu:"", shikaku:"", kanrisha:false, nurseKbn:true, defaultHours:8 };
+  const html = `
+    <div class="modal-bg" onclick="if(event.target===this) closeModal()">
+      <div class="modal">
+        <h3>${editing ? "スタッフ編集" : "スタッフ追加"}</h3>
+        <div class="field"><label>氏名 <span style="color:#c00">*</span></label><input id="m_name" type="text" value="${escHtml(s.name)}" placeholder="例: 田中 花子"></div>
+        <div class="field"><label>職種</label>
+          <select id="m_shokushu">
+            <option value="">-- 選択 --</option>
+            ${["管理者","看護職員","理学療法士","作業療法士","言語聴覚士"].map(v=>`<option value="${v}"${s.shokushu===v?" selected":""}>${v}</option>`).join("")}
+          </select>
+        </div>
+        <div class="field"><label>資格</label>
+          <select id="m_shikaku">
+            <option value="">-- 選択 --</option>
+            ${["保健師","看護師","准看護師","理学療法士","作業療法士","言語聴覚士"].map(v=>`<option value="${v}"${s.shikaku===v?" selected":""}>${v}</option>`).join("")}
+          </select>
+        </div>
+        <div class="field"><label>勤務形態</label>
+          <select id="m_keitai">
+            <option value="A"${s.keitai==="A"?" selected":""}>A: 常勤専従</option>
+            <option value="B"${s.keitai==="B"?" selected":""}>B: 常勤兼務</option>
+            <option value="C"${s.keitai==="C"?" selected":""}>C: 非常勤専従</option>
+            <option value="D"${s.keitai==="D"?" selected":""}>D: 非常勤兼務</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>1日の標準勤務時間（時間）</label>
+          <input id="m_hours" type="number" min="0.5" max="24" step="0.5" value="${s.defaultHours || 8}" style="width:100px">
+          <span style="font-size:11px;color:var(--text-muted);margin-left:6px">例: 08:30〜17:30 → 8、09:00〜15:00 → 6</span>
+        </div>
+        <div class="field-check"><input id="m_nurse" type="checkbox" ${s.nurseKbn?"checked":""}><label for="m_nurse">看護職員（常勤換算の対象）</label></div>
+        <div class="field-check"><input id="m_mgr" type="checkbox" ${s.kanrisha?"checked":""}><label for="m_mgr">管理者</label></div>
+        <div class="modal-actions">
+          <button class="btn btn-ghost" onclick="closeModal()">キャンセル</button>
+          <button class="btn btn-primary" onclick="saveStaffModal(${editing ? s.no : 0})">保存</button>
+        </div>
+      </div>
+    </div>`;
+  $("#modal-root").innerHTML = html;
+  setTimeout(() => $("#m_name")?.focus(), 50);
+}
+
+function saveStaffModal(editingNo) {
+  const name = $("#m_name").value.trim();
+  if (!name) { alert("氏名は必須です"); return; }
+  const rawHours = parseFloat($("#m_hours").value);
+  const data = {
+    name,
+    shokushu:     $("#m_shokushu").value.trim(),
+    shikaku:      $("#m_shikaku").value.trim(),
+    keitai:       $("#m_keitai").value,
+    nurseKbn:     $("#m_nurse").checked,
+    kanrisha:     $("#m_mgr").checked,
+    defaultHours: isNaN(rawHours) ? 8 : rawHours,
+  };
+  if (editingNo) {
+    const s = state.staff.find(x => x.no === editingNo);
+    Object.assign(s, data);
+  } else {
+    const nextNo = state.staff.reduce((mx, s) => Math.max(mx, s.no), 0) + 1;
+    state.staff.push({ no: nextNo, ...data });
+  }
+  saveData();
+  closeModal();
+  renderActivePanel();
+}
+
+function deleteStaff(no) {
+  const s = state.staff.find(x => x.no === no);
+  if (!s) return;
+  if (!confirm(`「${s.name}」を削除します。よろしいですか？`)) return;
+  state.staff = state.staff.filter(x => x.no !== no);
+  // シフトも削除
+  Object.keys(state.shifts).forEach(k => {
+    if (k.startsWith(no + "_")) delete state.shifts[k];
+  });
+  saveData();
+  renderActivePanel();
+}
+
+function closeModal() {
+  $("#modal-root").innerHTML = "";
+}
+
+/* =====================================================
+ * PDF取込
+ * ===================================================== */
+function renderImport() {
+  const step = state.importStep;
+  const stepBar = [1,2,3,4].map((n,i) => {
+    const cls = n === step ? "active" : (n < step ? "done" : "pending");
+    const labels = ["ファイル選択","AI解析中","スタッフ対応付け","完了"];
+    const arrow = i < 3 ? '<span class="step-arrow">›</span>' : "";
+    const numContent = (n < step) ? '<i data-lucide="check" style="width:12px;height:12px"></i>' : n;
+    return `<div class="step ${cls}"><span class="step-num">${numContent}</span>${labels[i]}</div>${arrow}`;
+  }).join("");
+
+  let body = "";
+  if (step === 1) body = renderImportStep1();
+  else if (step === 2) body = renderImportStep2();
+  else if (step === 3) body = renderImportStep3();
+  else if (step === 4) body = renderImportStep4();
+
+  $("#panel-import").innerHTML = `
+    <div class="steps-bar">${stepBar}</div>
+    ${body}
+  `;
+
+  if (step === 1) bindImportStep1();
+  if (step === 3) bindImportStep3();
+  refreshIcons();
+}
+
+function renderImportStep1() {
+  const apiKeyWarn = "";
+  const fileLabel = state.importFile
+    ? `<div style="font-weight:600;color:var(--green-dark)"><i data-lucide="file-text" style="vertical-align:middle;margin-right:4px"></i>${escHtml(state.importFile.name)} (${(state.importFile.size/1024).toFixed(1)}KB)</div>
+       <div style="font-size:11px;color:var(--text-muted);margin-top:4px">クリックして別のファイルを選択</div>`
+    : `<div style="margin-bottom:10px"><i data-lucide="file-up" style="width:32px;height:32px;color:#bbb"></i></div>
+       <div style="font-size:14px;font-weight:600;margin-bottom:6px">PDFをドラッグ＆ドロップ または クリックして選択</div>
+       <div style="font-size:11px;color:var(--text-muted)">あらゆる勤怠ソフトのシフト表PDFに対応（Claude AIで解析）</div>`;
+  return `
+    ${apiKeyWarn}
+    <label class="drop-area${state.importFile?" has-file":""}" id="dropArea">
+      <input type="file" id="pdfInput" accept=".pdf,application/pdf" />
+      ${fileLabel}
+    </label>
+    <div style="display:flex;gap:8px;margin-top:14px;justify-content:flex-end">
+      <button class="btn btn-green" id="analyzeBtn" ${state.importFile ? "" : "disabled"}>AIで解析する →</button>
+    </div>
+  `;
+}
+
+function bindImportStep1() {
+  const drop = $("#dropArea");
+  const input = $("#pdfInput");
+  drop.addEventListener("dragover", e => { e.preventDefault(); drop.classList.add("drag"); });
+  drop.addEventListener("dragleave", () => drop.classList.remove("drag"));
+  drop.addEventListener("drop", e => {
+    e.preventDefault(); drop.classList.remove("drag");
+    const f = e.dataTransfer.files[0];
+    if (f && f.type === "application/pdf") { state.importFile = f; renderImport(); }
+    else alert("PDFファイルをドロップしてください。");
+  });
+  input.addEventListener("change", e => {
+    const f = e.target.files[0];
+    if (f) { state.importFile = f; renderImport(); }
+  });
+  $("#analyzeBtn").addEventListener("click", startAnalyze);
+}
+
+function renderImportStep2() {
+  return `
+    <div style="background:#fff;border:1px solid var(--border);border-radius:8px;padding:18px">
+      <div style="margin-bottom:10px;font-weight:600"><i data-lucide="cpu" style="vertical-align:middle;margin-right:6px"></i>Claude AIがシフト表を解析中...</div>
+      <div class="progress"><div class="progress-bar" id="progBar"></div></div>
+      <div class="log" id="log"></div>
+    </div>
+  `;
+}
+
+function logLine(msg, cls="") {
+  const el = $("#log");
+  if (!el) return;
+  const div = document.createElement("div");
+  if (cls) div.className = cls;
+  div.textContent = "[" + new Date().toLocaleTimeString("ja-JP") + "] " + msg;
+  el.appendChild(div);
+  el.scrollTop = el.scrollHeight;
+}
+function setProgress(pct) {
+  const b = $("#progBar"); if (b) b.style.width = pct + "%";
+}
+
+async function startAnalyze() {
+  if (!state.importFile) { alert("ファイルが選択されていません"); return; }
+  if (!state.apiKey)     { alert("Anthropic APIキーを入力してください"); return; }
+  state.importStep = 2;
+  renderImport();
+
+  try {
+    logLine("PDFを読み込み中...", "info");
+    setProgress(15);
+    const buf = await state.importFile.arrayBuffer();
+    const b64 = arrayBufferToBase64(buf);
+    setProgress(35);
+    logLine(`PDFサイズ: ${(buf.byteLength/1024).toFixed(1)}KB`, "info");
+    logLine("Claude APIに送信中...", "info");
+    setProgress(50);
+
+    const result = await analyzeWithClaude(b64, state.apiKey);
+    setProgress(95);
+    logLine(`解析完了: ${result.detected?.length || 0}名を検出`, "ok");
+    setProgress(100);
+
+    state.importResult = result;
+    // 自動マッチング
+    state.importMappings = (result.detected || []).map(d => {
+      const norm = (str) => String(str).replace(/[\s　]/g, "");
+      const target = norm(d.name);
+      const match = state.staff.find(s => {
+        const sn = norm(s.name);
+        return sn === target || sn.includes(target) || target.includes(sn);
+      });
+      // daily形式（新）とwork_days形式（旧）の両方に対応
+      const daily = d.daily || {};
+      const workDays = d.work_days || Object.keys(daily).map(Number);
+      const totalH = Object.values(daily).reduce((s, h) => s + h, 0);
+      return {
+        pdfName:   d.name,
+        daily,                        // { "1": 8, "3": 6, ... }
+        workDays,                     // 後方互換
+        leaveDays: d.leave_days || [],
+        totalH,
+        staffNo: match ? match.no : "new",
+        keitai:  match ? match.keitai : "C",
+      };
+    });
+    setTimeout(() => { state.importStep = 3; renderImport(); }, 600);
+  } catch (e) {
+    logLine("エラー: " + e.message, "err");
+    setTimeout(() => {
+      if (confirm("解析に失敗しました。最初に戻りますか？\n\n" + e.message)) {
+        state.importStep = 1; renderImport();
+      }
+    }, 100);
+  }
+}
+
+function arrayBufferToBase64(buf) {
+  const bytes = new Uint8Array(buf);
+  let s = "";
+  const chunk = 0x8000;
+  for (let i = 0; i < bytes.length; i += chunk) {
+    s += String.fromCharCode.apply(null, bytes.subarray(i, i+chunk));
+  }
+  return btoa(s);
+}
+
+async function analyzeWithClaude(b64, apiKey) {
+  const prompt = `このPDFはシフト表・勤務表です。全スタッフの日別勤務時間を抽出してください。
+以下の形式のJSONのみを返してください（説明文・コードブロック不要）:
+{
+  "year": 年(数値),
+  "month": 月(数値),
+  "detected": [
+    {
+      "name": "氏名",
+      "daily": { "1": 8, "3": 6.5 },
+      "leave_days": [有給・特別休暇の日の数値配列]
+    }
+  ]
+}
+
+抽出ルール:
+- daily: 実際に出勤した日をキー、その日の実勤務時間数（数値）を値とする。時間帯が記載されている場合は終了時刻−開始時刻で計算（例: 08:30〜17:30=8時間、09:00〜15:00=6時間）
+- 休憩時間が明示されている場合は差し引く（明示なければそのまま計算）
+- leave_days: 有給休暇・特別休暇・振替休日等（dailyには含めない）
+- 所定休日・法定休日・公休はdailyにもleave_daysにも含めない
+- 全スタッフを漏れなく抽出する
+- 氏名は「姓 名」の形式で統一する`;
+
+  const res = await fetch("https://api.anthropic.com/v1/messages", {
+    method:"POST",
+    headers:{
+      "Content-Type":"application/json",
+      "x-api-key": apiKey,
+      "anthropic-version":"2023-06-01",
+      "anthropic-dangerous-direct-browser-access":"true",
+    },
+    body: JSON.stringify({
+      model:"claude-sonnet-4-20250514",
+      max_tokens: 4096,
+      messages:[{
+        role:"user",
+        content:[
+          { type:"document", source:{ type:"base64", media_type:"application/pdf", data:b64 } },
+          { type:"text", text: prompt },
+        ],
+      }],
+    }),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data?.error?.message || `APIエラー (${res.status})`);
+  const text = (data.content || []).map(b => b.text || "").join("");
+  const m = text.match(/\{[\s\S]*\}/);
+  if (!m) throw new Error("JSON形式のレスポンスを取得できませんでした");
+  return JSON.parse(m[0]);
+}
+
+function renderImportStep3() {
+  const ms = state.importMappings;
+  const detected = ms.length;
+  const auto = ms.filter(x => typeof x.staffNo === "number").length;
+  const need = ms.filter(x => x.staffNo === "new").length;
+
+  const r = state.importResult || {};
+  const periodNote = (r.year && r.month)
+    ? `<div class="note">PDFから検出された期間: ${r.year}年 ${r.month}月　／　現在の対象期間: ${state.year}年 ${state.month}月（取込先）</div>`
+    : "";
+
+  const rows = ms.map((m, idx) => {
+    const opts = `
+      <option value="new"${m.staffNo==="new"?" selected":""}>＋ 新規登録</option>
+      <option value="skip"${m.staffNo==="skip"?" selected":""}>取込まない</option>
+      ${state.staff.map(s => `<option value="${s.no}"${m.staffNo===s.no?" selected":""}>${escHtml(s.name)}</option>`).join("")}
+    `;
+    let badge;
+    if (m.staffNo === "skip") badge = '<span class="badge badge-gray">除外</span>';
+    else if (m.staffNo === "new") badge = '<span class="badge badge-blue">新規</span>';
+    else if (typeof m.staffNo === "number") badge = '<span class="badge badge-green">自動</span>';
+    else badge = '<span class="badge badge-red">要確認</span>';
+    const workDayCount = Object.keys(m.daily || {}).length || m.workDays.length;
+    const hoursLabel = m.totalH > 0 ? `${m.totalH}h` : `${workDayCount}日`;
+    return `<tr>
+      <td>${escHtml(m.pdfName)}</td>
+      <td style="text-align:center">${workDayCount}日 / ${hoursLabel}</td>
+      <td>有給 ${m.leaveDays.length}日</td>
+      <td><select data-i="${idx}" class="map-staff" style="width:100%;padding:4px;border:1px solid var(--border);border-radius:4px">${opts}</select></td>
+      <td>
+        <select data-i="${idx}" class="map-keitai" style="padding:4px;border:1px solid var(--border);border-radius:4px">
+          ${["A","B","C","D"].map(k => `<option value="${k}"${m.keitai===k?" selected":""}>${k}</option>`).join("")}
+        </select>
+      </td>
+      <td>${badge}</td>
+    </tr>`;
+  }).join("");
+
+  return `
+    ${periodNote}
+    <div class="three-up">
+      <div class="stat"><div class="l">検出スタッフ数</div><div class="v">${detected}</div></div>
+      <div class="stat"><div class="l">自動マッチ数</div><div class="v" style="color:var(--green-dark)">${auto}</div></div>
+      <div class="stat"><div class="l">要確認・新規</div><div class="v" style="color:var(--red-dark)">${need}</div></div>
+    </div>
+    <table class="gen">
+      <thead><tr>
+        <th>PDF内の氏名</th><th>勤務日数</th><th>有給</th><th>→ 台帳スタッフ</th><th>形態</th><th>状態</th>
+      </tr></thead>
+      <tbody>${rows || `<tr><td colspan="6" class="empty">検出データがありません</td></tr>`}</tbody>
+    </table>
+    <div style="display:flex;gap:8px;margin-top:14px;justify-content:flex-end">
+      <button class="btn btn-ghost" onclick="state.importStep=1; renderImport()">← 戻る</button>
+      <button class="btn btn-green" onclick="commitImport()">取込む</button>
+    </div>
+  `;
+}
+
+function bindImportStep3() {
+  $$(".map-staff").forEach(sel => {
+    sel.addEventListener("change", e => {
+      const i = Number(e.target.dataset.i);
+      const v = e.target.value;
+      state.importMappings[i].staffNo = (v === "new" || v === "skip") ? v : Number(v);
+      renderImport();
+    });
+  });
+  $$(".map-keitai").forEach(sel => {
+    sel.addEventListener("change", e => {
+      const i = Number(e.target.dataset.i);
+      state.importMappings[i].keitai = e.target.value;
+    });
+  });
+}
+
+function commitImport() {
+  const y = state.importResult?.year || state.year;
+  const m = state.importResult?.month || state.month;
+  const days = daysInMonth(y, m);
+  let imported = 0;
+
+  for (const map of state.importMappings) {
+    if (map.staffNo === "skip") continue;
+    let no;
+    if (map.staffNo === "new") {
+      no = state.staff.reduce((mx, s) => Math.max(mx, s.no), 0) + 1;
+      state.staff.push({
+        no, name: map.pdfName, keitai: map.keitai,
+        shokushu: "", shikaku: "", kanrisha: false, nurseKbn: true,
+      });
+    } else {
+      no = map.staffNo;
+      // 既存スタッフの形態も指定値で更新
+      const s = state.staff.find(x => x.no === no);
+      if (s) s.keitai = map.keitai;
+    }
+    // 全日リセット
+    const k = shiftKey(no, y, m);
+    state.shifts[k] = {};
+    for (let d = 1; d <= days; d++) state.shifts[k][d] = "休";
+    // daily形式（時間数あり）を優先、なければ work_days × defaultHours
+    const dh = getDefaultHours(no);
+    if (map.daily && Object.keys(map.daily).length > 0) {
+      Object.entries(map.daily).forEach(([d, h]) => { state.shifts[k][Number(d)] = h; });
+    } else {
+      map.workDays.forEach(d => { state.shifts[k][d] = dh; });
+    }
+    map.leaveDays.forEach(d => { state.shifts[k][d] = "有"; });
+    imported++;
+  }
+
+  // 取込んだ期間に表示も合わせる
+  state.year = y; state.month = m;
+  saveData();
+  state.importStep = 4;
+  state._lastImportedCount = imported;
+  renderImport();
+}
+
+function renderImportStep4() {
+  const n = state._lastImportedCount || 0;
+  return `
+    <div class="complete">
+      <div class="icon"><i data-lucide="check" style="width:28px;height:28px"></i></div>
+      <div style="font-size:16px;font-weight:600;margin-bottom:6px">取込完了</div>
+      <div style="color:var(--text-muted);margin-bottom:18px">${n}名のシフトを ${state.year}年${state.month}月に反映しました。</div>
+      <div style="display:flex;gap:8px;justify-content:center">
+        <button class="btn btn-primary" onclick="state.importStep=1;state.importFile=null;state.importResult=null;state.importMappings=[];switchPanel('shift')">一覧表を確認する</button>
+        <button class="btn btn-ghost" onclick="state.importStep=1;state.importFile=null;state.importResult=null;state.importMappings=[];renderImport()">別のPDFを取込む</button>
+      </div>
+    </div>
+  `;
+}
+
+/* =====================================================
+ * 常勤換算・基準
+ * ===================================================== */
+function renderKansan() {
+  const y = state.year, m = state.month;
+  const k = calcKansan(y, m);
+  const checks = checkKijun(y, m);
+
+  const kpis = `
+    <div class="kpi ${k.total>=2.5?"ok":"ng"}"><div class="kpi-label">常勤換算合計</div><div class="kpi-value">${k.total.toFixed(1)} <span style="font-size:14px;color:var(--text-muted)">名</span></div></div>
+    <div class="kpi"><div class="kpi-label">常勤看護職員数（A・B）</div><div class="kpi-value">${k.jokin} <span style="font-size:14px;color:var(--text-muted)">名</span></div></div>
+    <div class="kpi"><div class="kpi-label">非常勤月間時間合計</div><div class="kpi-value">${k.hijokinH} <span style="font-size:14px;color:var(--text-muted)">時間</span></div></div>
+    <div class="kpi"><div class="kpi-label">看護職員総数</div><div class="kpi-value">${k.nurseCount} <span style="font-size:14px;color:var(--text-muted)">名</span></div></div>
+  `;
+
+  const checksHtml = checks.map(c => `
+    <div class="check ${c.ok?"ok":"ng"}">
+      <div class="check-icon">${c.ok?'<i data-lucide="check"></i>':'<i data-lucide="x"></i>'}</div>
+      <div><div class="check-title">${escHtml(c.title)}</div><div class="check-desc">${escHtml(c.desc)}</div></div>
+    </div>
+  `).join("");
+
+  const nurses = state.staff.filter(s => s.nurseKbn);
+  const rows = nurses.map(s => {
+    const h = calcMonthlyHours(s.no, y, m);
+    const ks = staffKansan(s, y, m);
+    return `<tr>
+      <td>${escHtml(s.name)}</td>
+      <td><span class="badge badge-${s.keitai}">${s.keitai}</span></td>
+      <td>${h} 時間</td>
+      <td style="font-weight:600;color:var(--green-dark)">${ks}</td>
+    </tr>`;
+  }).join("");
+
+  $("#panel-kansan").innerHTML = `
+    <div class="kpi-grid">${kpis}</div>
+    <div class="section-title">人員基準チェック</div>
+    <div class="checks">${checksHtml}</div>
+    <div class="section-title">職員別 常勤換算（看護職員のみ）</div>
+    <table class="gen">
+      <thead><tr><th>氏名</th><th>形態</th><th>月間時間</th><th>常勤換算</th></tr></thead>
+      <tbody>${rows || `<tr><td colspan="4" class="empty">看護職員が登録されていません</td></tr>`}</tbody>
+    </table>
+  `;
+}
+
+/* =====================================================
+ * PDF出力（jsPDF + autoTable）
+ *  日本語非対応のため、ヘッダー類は英語、データ部は入力どおり出力
+ * ===================================================== */
+function exportPDF() {
+  const y = state.year, m = state.month;
+  const reiwa = y - 2018;
+
+  // 印刷ヘッダーを更新してから印刷
+  const sub = document.getElementById("ph-sub");
+  if (sub) {
+    sub.textContent =
+      `令和${reiwa}（${y}）年 ${m}月　事業所名：${state.jigyosho}`;
+  }
+
+  // 勤務形態一覧表パネルを表示状態にして印刷
+  const wasPanel = state.panel;
+  if (wasPanel !== "shift") {
+    $$(".panel").forEach(el => el.classList.toggle("active", el.id === "panel-shift"));
+  }
+
+  window.print();
+
+  // 元のパネルに戻す（印刷ダイアログが閉じた後）
+  if (wasPanel !== "shift") {
+    setTimeout(() => {
+      $$(".panel").forEach(el => el.classList.toggle("active", el.id === `panel-${wasPanel}`));
+    }, 500);
+  }
+}
+
+/* =====================================================
+ * 起動 / イベント
+ * ===================================================== */
+function buildSelects() {
+  const ys = $("#yearSel"), ms = $("#monthSel");
+  for (let y = 2024; y <= 2027; y++) {
+    const o = document.createElement("option"); o.value = y; o.textContent = `${y}年`;
+    ys.appendChild(o);
+  }
+  for (let m = 1; m <= 12; m++) {
+    const o = document.createElement("option"); o.value = m; o.textContent = `${m}月`;
+    ms.appendChild(o);
+  }
+  ys.addEventListener("change", () => { state.year = Number(ys.value); ensureShiftsForMonth(state.year, state.month); saveData(); renderActivePanel(); });
+  ms.addEventListener("change", () => { state.month = Number(ms.value); ensureShiftsForMonth(state.year, state.month); saveData(); renderActivePanel(); });
+}
+
+function bindSidebar() {
+  $$(".nav-item").forEach(el => {
+    el.addEventListener("click", () => switchPanel(el.dataset.panel));
+  });
+  $("#jigyoshoInp").addEventListener("input", e => { state.jigyosho = e.target.value; saveData(); });
+  $("#apiKeyInp").addEventListener("input", e => {
+    state.apiKey = e.target.value.trim();
+    saveData();
+    const st = $("#apiKeyStatus");
+    if (state.apiKey) { st.textContent = "✓ 設定済み"; st.style.color = "var(--green-dark)"; }
+    else              { st.textContent = "未設定（PDF取込に必要）"; st.style.color = "#c00"; }
+  });
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+  loadData();
+  buildSelects();
+  bindSidebar();
+  // 範囲外なら4月に
+  if (state.year < 2024 || state.year > 2027) state.year = 2026;
+  renderAll();
+});
+</script>
+</body>
+</html>
