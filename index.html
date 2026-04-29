@@ -1338,6 +1338,7 @@ function exportExcel() {
 
 function resetData() {
   if (!confirm("スタッフ情報・シフトデータをすべて削除します。\nAPIキーと事業所名は残ります。\nよろしいですか？")) return;
+  if (!confirm("本当に削除しますか？\nこの操作は元に戻せません。")) return;
   state.staff  = [];
   state.shifts = {};
   state.jigyosho = "○○訪問看護ステーション";
