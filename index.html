@@ -715,7 +715,7 @@ function renderStaff() {
 
 function openStaffModal(no) {
   const editing = state.staff.find(s => s.no === no);
-  const s = editing || { no:0, name:"", keitai:"A", shokushu:"", shikaku:"", kanrisha:false, nurseKbn:true, defaultHours:8 };
+  const s = editing || { no:0, name:"", keitai:"A", shokushu:"", shikaku:"", kanrisha:false, nurseKbn:true, defaultHours:8, taishokuDate:"" };
   const html = `
     <div class="modal-bg" onclick="if(event.target===this) closeModal()">
       <div class="modal">
@@ -748,6 +748,7 @@ function openStaffModal(no) {
         </div>
         <div class="field-check"><input id="m_nurse" type="checkbox" ${s.nurseKbn?"checked":""}><label for="m_nurse">看護職員（常勤換算の対象）</label></div>
         <div class="field-check"><input id="m_mgr" type="checkbox" ${s.kanrisha?"checked":""}><label for="m_mgr">管理者</label></div>
+        <div class="field"><label>退職日 <span style="font-size:10px;color:var(--text-muted)">（入力しないとスタッフを削除できません）</span></label><input id="m_taishoku" type="date" value="${escHtml(s.taishokuDate||"")}"></div>
         <div class="modal-actions">
           <button class="btn btn-ghost" onclick="closeModal()">キャンセル</button>
           <button class="btn btn-primary" onclick="saveStaffModal(${editing ? s.no : 0})">保存</button>
@@ -769,7 +770,8 @@ function saveStaffModal(editingNo) {
     keitai:       $("#m_keitai").value,
     nurseKbn:     $("#m_nurse").checked,
     kanrisha:     $("#m_mgr").checked,
-    defaultHours: isNaN(rawHours) ? 8 : rawHours,
+    defaultHours:  isNaN(rawHours) ? 8 : rawHours,
+    taishokuDate:  $("#m_taishoku").value || "",
   };
   if (editingNo) {
     const s = state.staff.find(x => x.no === editingNo);
@@ -786,7 +788,11 @@ function saveStaffModal(editingNo) {
 function deleteStaff(no) {
   const s = state.staff.find(x => x.no === no);
   if (!s) return;
-  if (!confirm(`「${s.name}」を削除します。よろしいですか？`)) return;
+  if (!s.taishokuDate) {
+    alert(`「${s.name}」は退職日が入力されていないため削除できません。\nスタッフ編集から退職日を入力してください。`);
+    return;
+  }
+  if (!confirm(`「${s.name}」（退職日: ${s.taishokuDate}）を削除します。よろしいですか？`)) return;
   state.staff = state.staff.filter(x => x.no !== no);
   // シフトも削除
   Object.keys(state.shifts).forEach(k => {
