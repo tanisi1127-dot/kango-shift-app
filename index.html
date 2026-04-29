@@ -262,6 +262,7 @@
           <i data-lucide="upload"></i> データ読み込み
           <input type="file" id="importDataFile" accept=".json" style="display:none">
         </label>
+        <button class="btn btn-ghost" style="font-size:11px;width:100%;justify-content:center;color:#c00;border-color:#fcc" onclick="resetData()"><i data-lucide="trash-2"></i> リセット</button>
       </div>
     </div>
   </aside>
@@ -1333,6 +1334,15 @@ function exportExcel() {
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, `${y}年${m}月`);
   XLSX.writeFile(wb, `勤務形態一覧表_${y}年${String(m).padStart(2, "0")}月.xlsx`);
+}
+
+function resetData() {
+  if (!confirm("スタッフ情報・シフトデータをすべて削除します。\nAPIキーと事業所名は残ります。\nよろしいですか？")) return;
+  state.staff  = [];
+  state.shifts = {};
+  state.jigyosho = "○○訪問看護ステーション";
+  saveData();
+  renderAll();
 }
 
 function exportData() {
