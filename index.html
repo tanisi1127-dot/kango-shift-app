@@ -255,6 +255,13 @@
       <label style="margin-top:10px">Anthropic APIキー</label>
       <input id="apiKeyInp" type="password" placeholder="sk-ant-..." style="font-size:10px" />
       <div id="apiKeyStatus" style="font-size:10px;margin-top:3px"></div>
+      <div style="margin-top:14px;display:flex;flex-direction:column;gap:6px">
+        <button class="btn btn-ghost" style="font-size:11px;width:100%;justify-content:center" onclick="exportData()"><i data-lucide="download"></i> データ書き出し</button>
+        <label class="btn btn-ghost" style="font-size:11px;width:100%;justify-content:center;cursor:pointer">
+          <i data-lucide="upload"></i> データ読み込み
+          <input type="file" id="importDataFile" accept=".json" style="display:none">
+        </label>
+      </div>
     </div>
   </aside>
   <main class="main">
@@ -1180,6 +1187,47 @@ function renderKansan() {
  * PDF出力（jsPDF + autoTable）
  *  日本語非対応のため、ヘッダー類は英語、データ部は入力どおり出力
  * ===================================================== */
+
+/* =====================================================
+ * データ書き出し・読み込み
+ * ===================================================== */
+function exportData() {
+  const data = {
+    version: 1,
+    exportedAt: new Date().toISOString(),
+    jigyosho: state.jigyosho,
+    staff: state.staff,
+    shifts: state.shifts,
+  };
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `kango_data_${state.jigyosho || "backup"}_${new Date().toISOString().slice(0,10)}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function importData(file) {
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      const data = JSON.parse(e.target.result);
+      if (!data.staff || !data.shifts) throw new Error("形式が正しくありません");
+      if (!confirm(`「${data.jigyosho || "不明"}」のデータを読み込みます。\n現在のデータは上書きされます。よろしいですか？`)) return;
+      state.staff   = data.staff;
+      state.shifts  = data.shifts;
+      if (data.jigyosho) state.jigyosho = data.jigyosho;
+      saveData();
+      renderAll();
+      alert("データを読み込みました。");
+    } catch (err) {
+      alert("読み込みエラー: " + err.message);
+    }
+  };
+  reader.readAsText(file);
+}
+
 function exportPDF() {
   const y = state.year, m = state.month;
   const reiwa = y - 2018;
@@ -1235,6 +1283,11 @@ function bindSidebar() {
     const st = $("#apiKeyStatus");
     if (state.apiKey) { st.textContent = "✓ 設定済み"; st.style.color = "var(--green-dark)"; }
     else              { st.textContent = "未設定（PDF取込に必要）"; st.style.color = "#c00"; }
+  });
+  $("#importDataFile").addEventListener("change", e => {
+    const file = e.target.files[0];
+    if (file) importData(file);
+    e.target.value = "";
   });
 }
 
