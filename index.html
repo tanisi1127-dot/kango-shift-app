@@ -244,6 +244,7 @@
       <div class="nav-item active" data-panel="shift"><i data-lucide="table-2"></i> 勤務形態一覧表</div>
       <div class="nav-item" data-panel="staff"><i data-lucide="users"></i> スタッフ管理</div>
       <div class="nav-item" data-panel="import"><i data-lucide="file-up"></i> PDF取込</div>
+      <div class="nav-item" data-panel="patterns"><i data-lucide="clock"></i> シフトパターン</div>
       <div class="nav-item" data-panel="kansan"><i data-lucide="calculator"></i> 常勤換算・基準</div>
     </nav>
     <div class="sidebar-section">
@@ -278,6 +279,7 @@
       <section class="panel active" id="panel-shift"></section>
       <section class="panel" id="panel-staff"></section>
       <section class="panel" id="panel-import"></section>
+      <section class="panel" id="panel-patterns"></section>
       <section class="panel" id="panel-kansan"></section>
     </div>
   </main>
@@ -297,6 +299,7 @@ const STORAGE = {
   jigyosho: "kango_jigyosho",
   apiKey:   "kango_apiKey",
   ym:       "kango_ym",
+  patterns: "kango_patterns",
 };
 
 const STD_HOURS = 176;
@@ -314,10 +317,11 @@ const KEITAI_AVATAR = { A:"#4ECDC4", B:"#3498DB", C:"#F39C12", D:"#95A5A6" };
 const DOW_JA = ["日","月","火","水","木","金","土"];
 
 const PANEL_TITLES = {
-  shift:  "勤務形態一覧表",
-  staff:  "スタッフ管理",
-  import: "PDF取込",
-  kansan: "常勤換算・基準",
+  shift:    "勤務形態一覧表",
+  staff:    "スタッフ管理",
+  import:   "PDF取込",
+  patterns: "シフトパターン設定",
+  kansan:   "常勤換算・基準",
 };
 
 /* =====================================================
@@ -337,6 +341,7 @@ const state = {
   importMappings: [],
   modal: null,
   weekMode: "reki",
+  shiftPatterns: [],
 };
 
 /* =====================================================
@@ -394,6 +399,10 @@ function loadData() {
 
   state.jigyosho = localStorage.getItem(STORAGE.jigyosho) || "○○訪問看護ステーション";
   state.apiKey   = localStorage.getItem(STORAGE.apiKey) || "";
+  try {
+    const p = localStorage.getItem(STORAGE.patterns);
+    state.shiftPatterns = p ? JSON.parse(p) : [];
+  } catch { state.shiftPatterns = []; }
 
   try {
     const ym = JSON.parse(localStorage.getItem(STORAGE.ym) || "null");
@@ -406,6 +415,7 @@ function saveData() {
   localStorage.setItem(STORAGE.shifts,   JSON.stringify(state.shifts));
   localStorage.setItem(STORAGE.jigyosho, state.jigyosho);
   localStorage.setItem(STORAGE.apiKey,   state.apiKey);
+  localStorage.setItem(STORAGE.patterns, JSON.stringify(state.shiftPatterns));
   localStorage.setItem(STORAGE.ym,       JSON.stringify({year:state.year, month:state.month}));
 }
 
@@ -499,10 +509,11 @@ function renderActivePanel() {
   const days = daysInMonth(state.year, state.month);
   $("#period").textContent = `${state.year}年${state.month}月（${days}日間）`;
   switch (state.panel) {
-    case "shift":  renderShift();  break;
-    case "staff":  renderStaff();  break;
-    case "import": renderImport(); break;
-    case "kansan": renderKansan(); break;
+    case "shift":    renderShift();    break;
+    case "staff":    renderStaff();    break;
+    case "import":   renderImport();   break;
+    case "patterns": renderPatterns(); break;
+    case "kansan":   renderKansan();   break;
   }
   refreshIcons();
 }
@@ -996,7 +1007,11 @@ function arrayBufferToBase64(buf) {
 }
 
 async function analyzeWithClaude(b64, apiKey) {
-  const prompt = `このPDFはシフト表・勤務表です。全スタッフの日別勤務時間を抽出してください。
+  const patternList = state.shiftPatterns.length > 0
+    ? `\n\n登録済みシフトパターン（勤怠名が一致する場合は名称をそのまま返す）:\n` +
+      state.shiftPatterns.map(p => `- "${p.name}": ${p.hours}時間`).join("\n")
+    : "";
+  const prompt = `このPDFはシフト表・勤務表です。全スタッフの日別勤務情報を抽出してください。
 以下の形式のJSONのみを返してください（説明文・コードブロック不要）:
 {
   "year": 年(数値),
@@ -1004,19 +1019,22 @@ async function analyzeWithClaude(b64, apiKey) {
   "detected": [
     {
       "name": "氏名",
-      "daily": { "1": 8, "3": 6.5 },
+      "daily": { "1": "通常勤務①", "3": 6.5 },
       "leave_days": [有給・特別休暇の日の数値配列]
     }
   ]
 }
 
 抽出ルール:
-- daily: 実際に出勤した日をキー、その日の実勤務時間数（数値）を値とする。時間帯が記載されている場合は終了時刻−開始時刻で計算（例: 08:30〜17:30=8時間、09:00〜15:00=6時間）
+- daily: 実際に出勤した日をキー、値は以下の優先順で設定する
+  1. 登録済みシフトパターン名と一致する場合 → そのパターン名（文字列）をそのまま返す
+  2. 時間帯が記載されている場合 → 終了時刻−開始時刻で時間数（数値）を計算（例: 08:30〜17:30=8、09:00〜15:00=6）
+  3. 勤務日のみ確認できる場合 → 8（デフォルト）
 - 休憩時間が明示されている場合は差し引く（明示なければそのまま計算）
 - leave_days: 有給休暇・特別休暇・振替休日等（dailyには含めない）
 - 所定休日・法定休日・公休はdailyにもleave_daysにも含めない
 - 全スタッフを漏れなく抽出する
-- 氏名は「姓 名」の形式で統一する`;
+- 氏名は「姓 名」の形式で統一する${patternList}`;
 
   const res = await fetch("https://api.anthropic.com/v1/messages", {
     method:"POST",
@@ -1059,7 +1077,6 @@ function renderImportStep3() {
 
   const rows = ms.map((m, idx) => {
     const opts = `
-      <option value="new"${m.staffNo==="new"?" selected":""}>＋ 新規登録</option>
       <option value="skip"${m.staffNo==="skip"?" selected":""}>取込まない</option>
       ${state.staff.map(s => `<option value="${s.no}"${m.staffNo===s.no?" selected":""}>${escHtml(staffName(s))}</option>`).join("")}
     `;
@@ -1121,6 +1138,17 @@ function bindImportStep3() {
   });
 }
 
+function resolveShiftHours(val, defaultH) {
+  if (typeof val === "number") return val;
+  if (typeof val === "string") {
+    const p = state.shiftPatterns.find(x => x.name === val);
+    if (p) return p.hours;
+    const n = parseFloat(val);
+    if (!isNaN(n)) return n;
+  }
+  return defaultH;
+}
+
 function commitImport() {
   const y = state.importResult?.year || state.year;
   const m = state.importResult?.month || state.month;
@@ -1128,28 +1156,19 @@ function commitImport() {
   let imported = 0;
 
   for (const map of state.importMappings) {
-    if (map.staffNo === "skip") continue;
-    let no;
-    if (map.staffNo === "new") {
-      no = state.staff.reduce((mx, s) => Math.max(mx, s.no), 0) + 1;
-      state.staff.push({
-        no, name: map.pdfName, keitai: map.keitai,
-        shokushu: "", shikaku: "", kanrisha: false, nurseKbn: true,
-      });
-    } else {
-      no = map.staffNo;
-      // 既存スタッフの形態も指定値で更新
-      const s = state.staff.find(x => x.no === no);
-      if (s) s.keitai = map.keitai;
-    }
+    if (map.staffNo === "skip" || map.staffNo === "new") continue;
+    const no = map.staffNo;
+    const s = state.staff.find(x => x.no === no);
+    if (!s) continue;
     // 全日リセット
     const k = shiftKey(no, y, m);
     state.shifts[k] = {};
     for (let d = 1; d <= days; d++) state.shifts[k][d] = "休";
-    // daily形式（時間数あり）を優先、なければ work_days × defaultHours
     const dh = getDefaultHours(no);
     if (map.daily && Object.keys(map.daily).length > 0) {
-      Object.entries(map.daily).forEach(([d, h]) => { state.shifts[k][Number(d)] = h; });
+      Object.entries(map.daily).forEach(([d, val]) => {
+        state.shifts[k][Number(d)] = resolveShiftHours(val, dh);
+      });
     } else {
       map.workDays.forEach(d => { state.shifts[k][d] = dh; });
     }
@@ -1183,6 +1202,80 @@ function renderImportStep4() {
 /* =====================================================
  * 常勤換算・基準
  * ===================================================== */
+/* =====================================================
+ * シフトパターン設定
+ * ===================================================== */
+function renderPatterns() {
+  const root = $("#panel-patterns");
+  const rows = state.shiftPatterns.map((p, i) => `
+    <tr>
+      <td class="txt" style="padding:4px 8px">${escHtml(p.name)}</td>
+      <td class="txt-c" style="width:80px">${p.hours}時間</td>
+      <td class="txt-c" style="width:80px">
+        <button class="btn btn-ghost btn-sm" onclick="editPattern(${i})">編集</button>
+        <button class="btn btn-ghost btn-sm" style="color:#c00" onclick="deletePattern(${i})">削除</button>
+      </td>
+    </tr>`).join("");
+  root.innerHTML = `
+    <div class="note" style="margin-bottom:12px">
+      PDFインポート時に勤怠名（例: 通常勤務①）が一致した場合、設定した時間数を勤務形態一覧表に反映します。
+    </div>
+    <button class="btn btn-primary" style="margin-bottom:12px" onclick="editPattern(-1)"><i data-lucide="plus"></i> パターン追加</button>
+    ${state.shiftPatterns.length === 0
+      ? `<div class="note">パターンが未登録です。「パターン追加」から登録してください。</div>`
+      : `<table class="shift" style="width:auto;min-width:400px">
+          <thead><tr><th>勤怠名</th><th>時間数</th><th></th></tr></thead>
+          <tbody>${rows}</tbody>
+        </table>`}
+  `;
+  refreshIcons();
+}
+
+function editPattern(idx) {
+  const p = idx >= 0 ? state.shiftPatterns[idx] : { name: "", hours: 8 };
+  const html = `
+    <div class="modal-bg" onclick="if(event.target===this) closeModal()">
+      <div class="modal" style="max-width:360px">
+        <h3>${idx >= 0 ? "パターン編集" : "パターン追加"}</h3>
+        <div class="field">
+          <label>勤怠名 <span style="color:#c00">*</span></label>
+          <input id="p_name" type="text" value="${escHtml(p.name)}" placeholder="例: 通常勤務①、08:30〜17:30">
+        </div>
+        <div class="field">
+          <label>勤務時間数（時間）</label>
+          <input id="p_hours" type="number" min="0.5" max="24" step="0.5" value="${p.hours}" style="width:100px">
+        </div>
+        <div class="modal-actions">
+          <button class="btn btn-ghost" onclick="closeModal()">キャンセル</button>
+          <button class="btn btn-primary" onclick="savePattern(${idx})">保存</button>
+        </div>
+      </div>
+    </div>`;
+  $("#modal-root").innerHTML = html;
+  setTimeout(() => $("#p_name")?.focus(), 50);
+}
+
+function savePattern(idx) {
+  const name = $("#p_name").value.trim();
+  if (!name) { alert("勤怠名は必須です"); return; }
+  const hours = parseFloat($("#p_hours").value) || 8;
+  if (idx >= 0) {
+    state.shiftPatterns[idx] = { name, hours };
+  } else {
+    state.shiftPatterns.push({ name, hours });
+  }
+  saveData();
+  closeModal();
+  renderPatterns();
+}
+
+function deletePattern(idx) {
+  if (!confirm(`「${state.shiftPatterns[idx].name}」を削除しますか？`)) return;
+  state.shiftPatterns.splice(idx, 1);
+  saveData();
+  renderPatterns();
+}
+
 function renderKansan() {
   const y = state.year, m = state.month;
   const k = calcKansan(y, m);
