@@ -462,19 +462,27 @@ function calcMonthlyHours(no, y, m) {
 function calcKansan(y, m) {
   const nurses = state.staff.filter(s => s.nurseKbn);
   const jokin = nurses.filter(s => s.keitai === "A" || s.keitai === "B").length;
-  const hijokinH = nurses
-    .filter(s => s.keitai === "C" || s.keitai === "D")
-    .reduce((sum, s) => sum + calcMonthlyHours(s.no, y, m), 0);
+  let jokinKansan = 0;
+  let hijokinH = 0;
+  nurses.forEach(s => {
+    const ratio = s.kanrisha ? (s.kanrishaRatio ?? 1.0) : 1.0;
+    if (s.keitai === "A" || s.keitai === "B") {
+      jokinKansan += 1.0 * ratio;
+    } else {
+      hijokinH += calcMonthlyHours(s.no, y, m) * ratio;
+    }
+  });
   const hijokinK = Math.floor(hijokinH / STD_HOURS * 10) / 10;
-  const total = Math.floor((jokin + hijokinK) * 10) / 10;
-  return { jokin, hijokinH, hijokinK, total, nurseCount: nurses.length };
+  const total = Math.floor((jokinKansan + hijokinK) * 10) / 10;
+  return { jokin, hijokinH, hijokinK, total, nurseCount: nurses.length, jokinKansan };
 }
 
 function staffKansan(s, y, m) {
   if (!s.nurseKbn) return "—";
-  if (s.keitai === "A" || s.keitai === "B") return "1.0";
+  const ratio = s.kanrisha ? (s.kanrishaRatio ?? 1.0) : 1.0;
+  if (s.keitai === "A" || s.keitai === "B") return (1.0 * ratio).toFixed(1);
   const h = calcMonthlyHours(s.no, y, m);
-  return (Math.floor(h / STD_HOURS * 10) / 10).toFixed(1);
+  return (Math.floor(h * ratio / STD_HOURS * 10) / 10).toFixed(1);
 }
 
 function checkKijun(y, m) {
@@ -731,14 +739,19 @@ function renderStaff() {
 
 function openStaffModal(no) {
   const editing = state.staff.find(s => s.no === no);
-  const s = editing || { no:0, name:"", keitai:"A", shokushu:"", shikaku:"", kanrisha:false, nurseKbn:true, defaultHours:8, taishokuDate:"" };
+  const s = editing || { no:0, keitai:"A", shokushu:"", shikaku:"", kanrisha:false, nurseKbn:true, defaultHours:8, taishokuDate:"", kanrishaRatio:1.0 };
+  // sei/mei フォールバック（旧データは name のみの場合がある）
+  const defSei = s.sei ?? (s.name ? s.name.split(/\s+/)[0] : "");
+  const defMei = s.mei ?? (s.name ? s.name.split(/\s+/).slice(1).join(" ") : "");
+  const ratio  = s.kanrishaRatio ?? 1.0;
+  const RATIO_OPTIONS = [1.0, 0.9, 0.8, 0.75, 0.7, 0.6, 0.5, 0.4, 0.3, 0.2, 0.1, 0.0];
   const html = `
     <div class="modal-bg" onclick="if(event.target===this) closeModal()">
       <div class="modal">
         <h3>${editing ? "スタッフ編集" : "スタッフ追加"}</h3>
         <div class="field" style="display:flex;gap:8px">
-          <div style="flex:1"><label>姓 <span style="color:#c00">*</span></label><input id="m_sei" type="text" value="${escHtml(s.sei||"")}" placeholder="例: 田中"></div>
-          <div style="flex:1"><label>名 <span style="color:#c00">*</span></label><input id="m_mei" type="text" value="${escHtml(s.mei||"")}" placeholder="例: 花子"></div>
+          <div style="flex:1"><label>姓 <span style="color:#c00">*</span></label><input id="m_sei" type="text" value="${escHtml(defSei)}" placeholder="例: 田中"></div>
+          <div style="flex:1"><label>名 <span style="color:#c00">*</span></label><input id="m_mei" type="text" value="${escHtml(defMei)}" placeholder="例: 花子"></div>
         </div>
         <div class="field"><label>職種</label>
           <select id="m_shokushu">
@@ -767,6 +780,13 @@ function openStaffModal(no) {
         </div>
         <div class="field-check"><input id="m_nurse" type="checkbox" ${s.nurseKbn?"checked":""}><label for="m_nurse">看護職員（常勤換算の対象）</label></div>
         <div class="field-check"><input id="m_mgr" type="checkbox" ${s.kanrisha?"checked":""}><label for="m_mgr">管理者</label></div>
+        <div class="field" id="ratioField" style="display:${s.kanrisha?"block":"none"};background:#FFF8E1;padding:10px;border-radius:6px;border:1px solid #FFE082">
+          <label>管理者業務の常勤換算比率 <span style="font-size:10px;color:var(--text-muted)">（兼務による業務時間割合）</span></label>
+          <select id="m_ratio" style="width:160px;margin-top:4px">
+            ${RATIO_OPTIONS.map(v=>`<option value="${v}"${ratio===v?" selected":""}>${v.toFixed(1)}（${Math.round(v*100)}%）</option>`).join("")}
+          </select>
+          <div style="font-size:11px;color:#888;margin-top:4px">例: 管理業務が半分なら 0.5、専従なら 1.0</div>
+        </div>
         <div class="field"><label>退職日 <span style="font-size:10px;color:var(--text-muted)">（入力しないとスタッフを削除できません）</span></label><input id="m_taishoku" type="date" value="${escHtml(s.taishokuDate||"")}"></div>
         <div class="modal-actions">
           <button class="btn btn-ghost" onclick="closeModal()">キャンセル</button>
@@ -775,7 +795,12 @@ function openStaffModal(no) {
       </div>
     </div>`;
   $("#modal-root").innerHTML = html;
-  setTimeout(() => $("#m_sei")?.focus(), 50);
+  setTimeout(() => {
+    $("#m_sei")?.focus();
+    $("#m_mgr").addEventListener("change", e => {
+      $("#ratioField").style.display = e.target.checked ? "block" : "none";
+    });
+  }, 50);
 }
 
 function saveStaffModal(editingNo) {
@@ -790,8 +815,9 @@ function saveStaffModal(editingNo) {
     keitai:       $("#m_keitai").value,
     nurseKbn:     $("#m_nurse").checked,
     kanrisha:     $("#m_mgr").checked,
-    defaultHours:  isNaN(rawHours) ? 8 : rawHours,
-    taishokuDate:  $("#m_taishoku").value || "",
+    defaultHours:    isNaN(rawHours) ? 8 : rawHours,
+    taishokuDate:    $("#m_taishoku").value || "",
+    kanrishaRatio:   $("#m_mgr").checked ? parseFloat($("#m_ratio").value) : 1.0,
   };
   if (editingNo) {
     const s = state.staff.find(x => x.no === editingNo);
