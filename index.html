@@ -1486,6 +1486,7 @@ function exportData() {
     jigyosho: state.jigyosho,
     staff: state.staff,
     shifts: state.shifts,
+    shiftPatterns: state.shiftPatterns,
   };
   const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
   const url = URL.createObjectURL(blob);
@@ -1503,9 +1504,10 @@ function importData(file) {
       const data = JSON.parse(e.target.result);
       if (!data.staff || !data.shifts) throw new Error("形式が正しくありません");
       if (!confirm(`「${data.jigyosho || "不明"}」のデータを読み込みます。\n現在のデータは上書きされます。よろしいですか？`)) return;
-      state.staff   = data.staff;
-      state.shifts  = data.shifts;
-      if (data.jigyosho) state.jigyosho = data.jigyosho;
+      state.staff         = data.staff;
+      state.shifts        = data.shifts;
+      if (data.jigyosho)      state.jigyosho      = data.jigyosho;
+      if (data.shiftPatterns) state.shiftPatterns  = data.shiftPatterns;
       saveData();
       renderAll();
       alert("データを読み込みました。");
