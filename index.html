@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>訪問看護シフト管理</title>
 <script src="https://unpkg.com/lucide@0.468.0/dist/umd/lucide.min.js"></script>
-<script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js"></script>
 <style>
   :root{
     --green-bg:#E1F5EE; --green-dark:#0F6E56;
@@ -1199,51 +1199,136 @@ function exportExcel() {
   const displayDays = state.weekMode === "4weeks" ? 28 : totalDays;
   const allStaff = [...state.staff.filter(s => s.nurseKbn), ...state.staff.filter(s => !s.nurseKbn)];
 
-  // 週目グループ行
-  const row1 = ["No", "職種", "形態", "資格", "氏名"];
+  const KEITAI_CLR = {
+    A: { bg: "C8E6C9", fg: "1B5E20" },
+    B: { bg: "BBDEFB", fg: "0D47A1" },
+    C: { bg: "FFF9C4", fg: "E65100" },
+    D: { bg: "EEEEEE", fg: "424242" },
+  };
+  const bd = s => ({ style: s || "thin", color: { rgb: "BBBBBB" } });
+  const border = () => ({ top: bd(), bottom: bd(), left: bd(), right: bd() });
+  const weekBorder = () => ({ top: bd(), bottom: bd("medium"), left: bd(), right: bd() });
+  const mkCell = (v, s) => ({ v: v ?? "", s });
+  const thStyle = (extra={}) => ({
+    fill: { fgColor: { rgb: "E8F4F8" } },
+    font: { bold: true, sz: 10, name: "游ゴシック" },
+    alignment: { horizontal: "center", vertical: "center" },
+    border: border(), ...extra,
+  });
+
+  const wsData = [];
   const merges = [];
+  const rows = [];
+
+  // ── タイトル行 ──────────────────────────
+  const reiwa = y - 2018;
+  const titleVal = `令和${reiwa}（${y}）年 ${m}月　勤務形態一覧表　${state.jigyosho}`;
+  rows.push([mkCell(titleVal, {
+    font: { bold: true, sz: 12, name: "游ゴシック" },
+    alignment: { horizontal: "left", vertical: "center" },
+  })]);
+  merges.push({ s: { r: 0, c: 0 }, e: { r: 0, c: 4 + displayDays + 2 } });
+
+  // ── 週目グループ行 ────────────────────────
+  const row1 = [
+    mkCell("No",   thStyle()),
+    mkCell("職種", thStyle()),
+    mkCell("形態", thStyle()),
+    mkCell("資格", thStyle()),
+    mkCell("氏名", thStyle()),
+  ];
   let col = 5;
   for (let d = 1; d <= displayDays; d += 7) {
     const end = Math.min(d + 6, displayDays);
     const weekNum = Math.ceil(d / 7);
-    row1.push(`${weekNum}週目`);
-    for (let i = 1; i < end - d + 1; i++) row1.push(null);
-    if (end > d) merges.push({ s: { r: 0, c: col }, e: { r: 0, c: col + (end - d) } });
+    const wks = { fill: { fgColor: { rgb: "C8E6C9" } }, font: { bold: true, sz: 10, name: "游ゴシック" }, alignment: { horizontal: "center", vertical: "center" }, border: weekBorder() };
+    row1.push(mkCell(`${weekNum}週目`, wks));
+    for (let i = 1; i < end - d + 1; i++) row1.push(mkCell("", { fill: { fgColor: { rgb: "C8E6C9" } }, border: weekBorder() }));
+    if (end > d) merges.push({ s: { r: 1, c: col }, e: { r: 1, c: col + (end - d) } });
     col += end - d + 1;
   }
-  row1.push("月計", "週平均", "換算");
+  row1.push(mkCell("月計", thStyle()), mkCell("週平均", thStyle()), mkCell("換算", thStyle()));
+  rows.push(row1);
 
-  // 日付・曜日行
-  const row2 = [null, null, null, null, null];
+  // ── 日付・曜日行 ──────────────────────────
+  const row2 = [
+    mkCell("", thStyle()), mkCell("", thStyle()), mkCell("", thStyle()),
+    mkCell("", thStyle()), mkCell("", thStyle()),
+  ];
   for (let d = 1; d <= displayDays; d++) {
-    row2.push(`${d}(${DOW_JA[new Date(y, m-1, d).getDay()]})`);
+    const dow = new Date(y, m-1, d).getDay();
+    const isSun = dow === 0, isSat = dow === 6;
+    const bg = isSun ? "FFCDD2" : isSat ? "C5CAE9" : "E8F4F8";
+    const fg = isSun ? "B71C1C" : isSat ? "1A237E" : "333333";
+    row2.push(mkCell(`${d}\n${DOW_JA[dow]}`, {
+      fill: { fgColor: { rgb: bg } },
+      font: { bold: true, sz: 9, color: { rgb: fg }, name: "游ゴシック" },
+      alignment: { horizontal: "center", vertical: "center", wrapText: true },
+      border: border(),
+    }));
   }
-  row2.push(null, null, null);
+  row2.push(mkCell("", thStyle()), mkCell("", thStyle()), mkCell("", thStyle()));
+  rows.push(row2);
 
-  // データ行
-  const dataRows = allStaff.map(s => {
+  // ── スタッフ行 ────────────────────────────
+  allStaff.forEach(s => {
     let totalH = 0;
-    const row = [s.no, s.shokushu, s.keitai, s.shikaku, s.name];
+    const clr = KEITAI_CLR[s.keitai] || KEITAI_CLR.A;
+    const fixSt = { fill: { fgColor: { rgb: "FAFAFA" } }, font: { sz: 10, name: "游ゴシック" }, alignment: { vertical: "center" }, border: border() };
+    const row = [
+      mkCell(s.no,       { ...fixSt, alignment: { horizontal: "center", vertical: "center" } }),
+      mkCell(s.shokushu, { ...fixSt, alignment: { horizontal: "left",   vertical: "center" } }),
+      mkCell(s.keitai,   { fill: { fgColor: { rgb: clr.bg } }, font: { bold: true, sz: 10, color: { rgb: clr.fg }, name: "游ゴシック" }, alignment: { horizontal: "center", vertical: "center" }, border: border() }),
+      mkCell(s.shikaku,  { ...fixSt, alignment: { horizontal: "left",   vertical: "center" } }),
+      mkCell(s.name,     { ...fixSt, font: { bold: true, sz: 10, name: "游ゴシック" }, alignment: { horizontal: "left", vertical: "center" } }),
+    ];
     for (let d = 1; d <= displayDays; d++) {
       const v = getShift(s.no, y, m, d);
-      if (v === "有") { row.push("有"); totalH += (s.defaultHours || 8); }
-      else if (typeof v === "number") { row.push(v); totalH += v; }
-      else row.push(null);
+      const dow = new Date(y, m-1, d).getDay();
+      if (v === "有") {
+        totalH += (s.defaultHours || 8);
+        row.push(mkCell("有", { fill: { fgColor: { rgb: "F3E5F5" } }, font: { bold: true, sz: 10, color: { rgb: "7B1FA2" }, name: "游ゴシック" }, alignment: { horizontal: "center", vertical: "center" }, border: border() }));
+      } else if (typeof v === "number") {
+        totalH += v;
+        row.push(mkCell(v % 1 === 0 ? v : v.toFixed(1), { fill: { fgColor: { rgb: clr.bg } }, font: { bold: true, sz: 10, color: { rgb: clr.fg }, name: "游ゴシック" }, alignment: { horizontal: "center", vertical: "center" }, border: border() }));
+      } else {
+        const offBg = dow === 0 ? "FFCDD2" : dow === 6 ? "C5CAE9" : "FFFFFF";
+        row.push(mkCell("", { fill: { fgColor: { rgb: offBg } }, border: border() }));
+      }
     }
-    row.push(totalH, Number((totalH / displayDays * 7).toFixed(1)), staffKansan(s, y, m));
-    return row;
+    const weekAvg = Number((totalH / displayDays * 7).toFixed(1));
+    const kansan  = staffKansan(s, y, m);
+    const sumSt = { font: { bold: true, sz: 10, name: "游ゴシック" }, alignment: { horizontal: "center", vertical: "center" }, border: border() };
+    row.push(mkCell(totalH, sumSt), mkCell(weekAvg, { ...sumSt, font: { sz: 10, name: "游ゴシック" } }), mkCell(kansan, { ...sumSt, font: { bold: true, sz: 10, color: { rgb: "0F6E56" }, name: "游ゴシック" } }));
+    rows.push(row);
   });
 
-  const wsData = [row1, row2, ...dataRows];
-  const ws = XLSX.utils.aoa_to_sheet(wsData);
-  ws["!merges"] = merges;
+  // ── 常勤換算合計行 ────────────────────────
+  const k = calcKansan(y, m);
+  const totSt = { fill: { fgColor: { rgb: "F0F0F0" } }, font: { bold: true, sz: 10, name: "游ゴシック" }, border: border() };
+  const totRow = [mkCell("看護職員　常勤換算合計", totSt)];
+  merges.push({ s: { r: rows.length, c: 0 }, e: { r: rows.length, c: 4 } });
+  for (let i = 1; i < 5; i++) totRow.push(mkCell("", totSt));
+  const infoTxt = `常勤(A･B): ${k.jokin}名 ／ 非常勤(C･D): ${k.hijokinH}h ／ 換算: ${k.hijokinK.toFixed(1)}名`;
+  for (let i = 0; i < displayDays - 1; i++) totRow.push(mkCell("", totSt));
+  totRow.push(mkCell(infoTxt, { ...totSt, alignment: { horizontal: "right", vertical: "center" } }));
+  const isOk = k.total >= 2.5;
+  totRow.push(mkCell("", totSt));
+  totRow.push(mkCell("", totSt));
+  totRow.push(mkCell(`${k.total.toFixed(1)}名`, { fill: { fgColor: { rgb: isOk ? "C8E6C9" : "FFCDD2" } }, font: { bold: true, sz: 11, color: { rgb: isOk ? "1B5E20" : "B71C1C" }, name: "游ゴシック" }, alignment: { horizontal: "center", vertical: "center" }, border: border() }));
+  rows.push(totRow);
 
-  // 列幅設定
-  ws["!cols"] = [
-    { wch: 4 }, { wch: 10 }, { wch: 6 }, { wch: 10 }, { wch: 10 },
-    ...Array(displayDays).fill({ wch: 5 }),
-    { wch: 6 }, { wch: 7 }, { wch: 6 },
-  ];
+  // ── ワークシート構築 ──────────────────────
+  const values = rows.map(r => r.map(c => c.v));
+  const ws = XLSX.utils.aoa_to_sheet(values);
+  rows.forEach((row, r) => row.forEach((cell, c) => {
+    const addr = XLSX.utils.encode_cell({ r, c });
+    if (!ws[addr]) ws[addr] = { v: "", t: "s" };
+    ws[addr].s = cell.s;
+  }));
+  ws["!merges"] = merges;
+  ws["!cols"] = [{ wch: 4 }, { wch: 10 }, { wch: 5 }, { wch: 10 }, { wch: 12 }, ...Array(displayDays).fill({ wch: 4.5 }), { wch: 6 }, { wch: 7 }, { wch: 6 }];
+  ws["!rows"] = [{ hpt: 20 }, { hpt: 18 }, { hpt: 26 }, ...Array(allStaff.length + 1).fill({ hpt: 22 })];
 
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, `${y}年${m}月`);
