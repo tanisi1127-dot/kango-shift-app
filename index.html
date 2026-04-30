@@ -762,7 +762,7 @@ function openStaffModal(no) {
         </div>
         <div class="field">
           <label>1日の標準勤務時間（時間）</label>
-          <input id="m_hours" type="number" min="0.5" max="24" step="0.5" value="${s.defaultHours || 8}" style="width:100px">
+          <input id="m_hours" type="number" min="0.25" max="24" step="0.25" value="${s.defaultHours || 8}" style="width:100px">
           <span style="font-size:11px;color:var(--text-muted);margin-left:6px">例: 08:30〜17:30 → 8、09:00〜15:00 → 6</span>
         </div>
         <div class="field-check"><input id="m_nurse" type="checkbox" ${s.nurseKbn?"checked":""}><label for="m_nurse">看護職員（常勤換算の対象）</label></div>
